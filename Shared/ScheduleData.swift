@@ -49,10 +49,12 @@ struct ServiceCalendar: Codable, Sendable {
     var added: [Int] = []
     var removed: [Int] = []
 
-    func isActive(on day: Int, weekdayIndex: Int) -> Bool {
+    /// `ignoringEnd` keeps the weekly pattern running after `end`, for a feed that has
+    /// expired without a replacement being published.
+    func isActive(on day: Int, weekdayIndex: Int, ignoringEnd: Bool = false) -> Bool {
         if removed.contains(day) { return false }
         if added.contains(day) { return true }
-        guard day >= start, day <= end, weekdays.indices.contains(weekdayIndex) else { return false }
+        guard day >= start, day <= end || ignoringEnd, weekdays.indices.contains(weekdayIndex) else { return false }
         return weekdays[weekdayIndex]
     }
 }
@@ -94,7 +96,11 @@ struct ScheduleData: Codable, Sendable {
             let weekdayIndex = (weekday + 5) % 7 // Calendar: Sunday = 1. GTFS order: Monday first.
 
             var active = Set<Int>()
-            for index in services.indices where services[index].isActive(on: ymd, weekdayIndex: weekdayIndex) {
+            // PATH has left its published feed in place past its end date before, so an
+            // expired feed keeps its regular weekly timetable rather than going blank.
+            let expired = feedEnd.map { ymd > $0 } ?? false
+            for index in services.indices
+            where services[index].isActive(on: ymd, weekdayIndex: weekdayIndex, ignoringEnd: expired) {
                 active.insert(index)
             }
             if active.isEmpty { continue }

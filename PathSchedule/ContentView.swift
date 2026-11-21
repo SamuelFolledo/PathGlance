@@ -67,7 +67,7 @@ struct ContentView: View {
             if let schedule = model.schedule {
                 LabeledContent("Updated", value: schedule.importedAt.formatted(date: .abbreviated, time: .shortened))
                 if schedule.isExpired() {
-                    Label("This timetable has passed its end date. Update it.", systemImage: "exclamationmark.triangle")
+                    Label("This timetable has passed its end date. Times follow its regular weekly pattern until PATH publishes a new one.", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 }
             } else {
