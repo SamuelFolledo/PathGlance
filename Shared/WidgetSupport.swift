@@ -162,6 +162,18 @@ struct WidgetPreset: Identifiable, Hashable, Sendable {
                      look: WidgetLook(font: .standard, style: WidgetStyle(density: .regular, timeFormat: .full, showArrival: true, maxTimes: 2))),
         WidgetPreset(id: "board", name: "Departure board", detail: "Monospaced, columns line up",
                      look: WidgetLook(font: .monospaced, style: WidgetStyle(density: .compact, timeFormat: .short))),
+        WidgetPreset(id: "timetable", name: "Timetable", detail: "Serif, like a printed timetable",
+                     look: WidgetLook(font: .serif, style: WidgetStyle(density: .compact, timeFormat: .full))),
+        WidgetPreset(id: "soft", name: "Soft", detail: "Rounded text, full times",
+                     look: WidgetLook(font: .rounded, style: WidgetStyle(density: .compact, timeFormat: .full))),
+        WidgetPreset(id: "commuter", name: "Commuter", detail: "When the next train arrives, then as many as fit",
+                     look: WidgetLook(font: .condensed, style: WidgetStyle(density: .compact, timeFormat: .full, showArrival: true))),
+        WidgetPreset(id: "nexttwo", name: "Next two", detail: "Big and rounded, only the next two trains",
+                     look: WidgetLook(font: .rounded, style: WidgetStyle(density: .regular, timeFormat: .full, maxTimes: 2))),
+        WidgetPreset(id: "terminal", name: "Terminal", detail: "Big monospaced text, up to four trains",
+                     look: WidgetLook(font: .monospaced, style: WidgetStyle(density: .regular, timeFormat: .short, maxTimes: 4))),
+        WidgetPreset(id: "headline", name: "Headline", detail: "Big serif text, up to three trains",
+                     look: WidgetLook(font: .serif, style: WidgetStyle(density: .regular, timeFormat: .short, maxTimes: 3))),
     ]
 
     static func matching(_ look: WidgetLook) -> WidgetPreset? {

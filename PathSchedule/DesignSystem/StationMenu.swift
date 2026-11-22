@@ -39,17 +39,24 @@ struct StationMenu: View {
 
     var body: some View {
         PopoverMenu {
-            PopoverSectionTitle(title: "From")
+            // Following your location and picking a station are two different things,
+            // so each has its own section.
             if hasLocation {
-                PopoverRadioRow(title: "Nearest", detail: location.station?.shortName, isOn: followsNearest) {
+                PopoverSectionTitle(title: "Nearest to you")
+                PopoverRadioRow(title: location.station?.name ?? "Nearest station", detail: "Follows you", isOn: followsNearest) {
                     choose(nil)
                 }
+                .accessibilityIdentifier("station-nearest")
+                Divider().padding(.vertical, Theme.Spacing.xs)
             } else if location.authorization == .notDetermined {
+                PopoverSectionTitle(title: "Nearest to you")
                 PopoverActionRow(title: "Use my location", symbol: "location") {
                     isShowing = false
                     location.requestPermission()
                 }
+                Divider().padding(.vertical, Theme.Spacing.xs)
             }
+            PopoverSectionTitle(title: hasLocation ? "Always from" : "From")
             ForEach(Station.allCases) { station in
                 // The station in use is marked, whether it was picked or is the nearest.
                 PopoverRadioRow(title: station.name, isOn: station == current) {

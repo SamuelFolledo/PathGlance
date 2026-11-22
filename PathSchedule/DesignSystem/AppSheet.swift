@@ -15,9 +15,9 @@ extension View {
     /// and in reach.
     ///
     /// Dragging works the way a system sheet does, and there is only ever one gesture: the
-    /// content's own scroll drag (`SheetScrollBridge`). At half height it moves the sheet,
-    /// up to full height or down to close. At full height it scrolls the content, and once
-    /// the content is at its top a pull down takes the sheet with it. A drag never also
+    /// content's own scroll drag (`SheetScrollBridge`). The content scrolls at either
+    /// height; a pull down from its top lowers or closes the sheet, and a push up from its
+    /// end raises a half-height sheet to full. A drag never also
     /// taps what it started on. The grabber and title drag the sheet too; tapping the
     /// dimmed area, the X and VoiceOver's escape gesture close it.
     ///
@@ -117,7 +117,9 @@ private struct AppSheetCard<Content: View>: View {
     }
 
     /// The card is always laid out at full height and only ever moved, never resized,
-    /// so following the finger costs nothing.
+    /// so following the finger costs nothing. The part of it that hangs below the screen
+    /// while it rests at half height is made up for with padding under the content, so
+    /// everything in it can be scrolled into view, clear of the tab bar, at either height.
     private func sheet(in proxy: GeometryProxy) -> some View {
         let bottomInset = proxy.safeAreaInsets.bottom
         // A phone on its side has little height: the sheet is always full height there.
@@ -134,15 +136,18 @@ private struct AppSheetCard<Content: View>: View {
             ScrollView {
                 content
                     .padding(.horizontal, Theme.Spacing.contentSide)
-                    // The card runs under the tab bar; the content stops above it.
-                    .padding(.bottom, bottomInset + Theme.Spacing.lg)
+                    // The card runs under the tab bar and, at half height, off the screen:
+                    // the content ends above both, with some room to spare.
+                    .padding(.bottom, bottomInset + Theme.Spacing.xl + rest)
                     .background(SheetScrollBridge(
-                        cardFollowsEveryDrag: !(isExpanded || onlyFull),
+                        canGrow: !(isExpanded || onlyFull),
                         onDrag: { drag = $0 },
                         onEnd: { settle(translation: $0, velocity: $1, full: full, halfRest: halfRest) }
                     ))
             }
-            .scrollBounceBehavior(.basedOnSize)
+            // Short content still bounces, so a drag on it can move the card.
+            .scrollBounceBehavior(.always, axes: .vertical)
+            .scrollIndicators(.hidden)
         }
         .frame(maxWidth: 560)
         .frame(height: full, alignment: .top)
@@ -232,15 +237,18 @@ private enum SheetRest {
 /// Lets a sheet follow drags on its content the way a system sheet does, by listening to
 /// the content scroll view's own pan gesture. There is no second gesture competing with
 /// it, which is what makes a card stutter or move the wrong way. The content scrolls until
-/// the drag is the card's; from then on the content is held still and the card moves:
+/// it reaches an edge in the drag's direction; from then on the content is held at that
+/// edge and the card moves:
 ///
-/// - while the card is at half height, every drag is the card's;
-/// - at full height, a pull down from the content's top is the card's.
+/// - pulling down at the content's top lowers or closes the card;
+/// - pushing up at the content's end raises it, while it is not at full height;
+/// - content that fits without scrolling is at both edges, so it always moves the card.
 ///
 /// Because it is the scroll view's pan, a drag cancels the touch on whatever row or button
 /// it started on, so nothing is tapped by a swipe.
 private struct SheetScrollBridge: UIViewRepresentable {
-    let cardFollowsEveryDrag: Bool
+    /// Pushing up at the content's end may raise the card.
+    let canGrow: Bool
     let onDrag: (CGFloat) -> Void
     let onEnd: (_ translation: CGFloat, _ velocity: CGFloat) -> Void
 
@@ -256,7 +264,7 @@ private struct SheetScrollBridge: UIViewRepresentable {
     }
 
     func updateUIView(_ view: ProbeView, context: Context) {
-        context.coordinator.cardFollowsEveryDrag = cardFollowsEveryDrag
+        context.coordinator.canGrow = canGrow
         context.coordinator.onDrag = onDrag
         context.coordinator.onEnd = onEnd
     }
@@ -271,17 +279,21 @@ private struct SheetScrollBridge: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject {
-        var cardFollowsEveryDrag = false
+        private enum Edge { case top, bottom }
+
+        var canGrow = false
         var onDrag: (CGFloat) -> Void = { _ in }
         var onEnd: (CGFloat, CGFloat) -> Void = { _, _ in }
 
         private weak var scrollView: UIScrollView?
-        /// The card is following this drag.
-        private var cardOwns = false
+        /// The edge the card took this drag over from; `nil` while the content scrolls.
+        private var edge: Edge?
         /// The finger's translation when the card took over.
-        private var baseline: CGFloat = 0
-        /// Where the content is held while the card moves.
-        private var heldOffset: CGFloat = 0
+        private var anchor: CGFloat = 0
+        private var lastTranslation: CGFloat = 0
+        /// A sideways drag (turning a page inside the sheet) never moves the card.
+        private var isIgnored = false
+        private var hasCheckedDirection = false
 
         func attach(from probe: UIView) {
             guard scrollView == nil else { return }
@@ -289,43 +301,84 @@ private struct SheetScrollBridge: UIViewRepresentable {
             while let current = view, !(current is UIScrollView) { view = current.superview }
             guard let found = view as? UIScrollView else { return }
             scrollView = found
+            // Short content must still produce a pan to move the card with.
+            found.alwaysBounceVertical = true
             found.panGestureRecognizer.addTarget(self, action: #selector(pan(_:)))
         }
 
         @objc private func pan(_ recognizer: UIPanGestureRecognizer) {
             guard let scrollView else { return }
-            let translation = recognizer.translation(in: scrollView.superview).y
-            let top = -scrollView.adjustedContentInset.top
+            // In window coordinates: the scroll view's own shift as the card moves.
+            let translation = recognizer.translation(in: nil)
 
             switch recognizer.state {
             case .began:
-                cardOwns = false
-                heldOffset = scrollView.contentOffset.y
+                reset()
+                lastTranslation = translation.y
             case .changed:
-                if !cardOwns {
-                    let atTop = scrollView.contentOffset.y <= top + 0.5
-                    if cardFollowsEveryDrag {
-                        cardOwns = true
-                        baseline = 0
-                    } else if atTop && translation > 0 {
-                        cardOwns = true
-                        baseline = translation
-                        heldOffset = top
+                guard !isIgnored else { return }
+                if !hasCheckedDirection, translation != .zero {
+                    hasCheckedDirection = true
+                    if abs(translation.x) > abs(translation.y) {
+                        isIgnored = true
+                        return
                     }
                 }
-                if cardOwns {
-                    scrollView.contentOffset.y = heldOffset
-                    onDrag(translation - baseline)
+                if edge == nil {
+                    let delta = translation.y - lastTranslation
+                    if delta > 0, isAtTop(scrollView) {
+                        edge = .top
+                        anchor = translation.y
+                    } else if delta < 0, isAtBottom(scrollView), canGrow {
+                        edge = .bottom
+                        anchor = translation.y
+                    }
+                }
+                lastTranslation = translation.y
+                if let edge {
+                    pin(scrollView, at: edge)
+                    onDrag(translation.y - anchor)
                 }
             case .ended, .cancelled, .failed:
-                guard cardOwns else { return }
-                cardOwns = false
-                // Stop the scroll view coasting on with the release.
-                scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: heldOffset), animated: false)
-                onEnd(translation - baseline, recognizer.velocity(in: scrollView.superview).y)
+                if let edge {
+                    // Also stops the scroll view coasting on with the release.
+                    pin(scrollView, at: edge)
+                    onEnd(translation.y - anchor, recognizer.velocity(in: nil).y)
+                }
+                reset()
             default:
                 break
             }
+        }
+
+        private func reset() {
+            edge = nil
+            anchor = 0
+            lastTranslation = 0
+            isIgnored = false
+            hasCheckedDirection = false
+        }
+
+        private func pin(_ scrollView: UIScrollView, at edge: Edge) {
+            let y = edge == .top ? topOffset(scrollView) : bottomOffset(scrollView)
+            scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: y), animated: false)
+        }
+
+        private func topOffset(_ scrollView: UIScrollView) -> CGFloat {
+            -scrollView.adjustedContentInset.top
+        }
+
+        private func bottomOffset(_ scrollView: UIScrollView) -> CGFloat {
+            let insets = scrollView.adjustedContentInset
+            return max(scrollView.contentSize.height + insets.bottom - scrollView.bounds.height, -insets.top)
+        }
+
+        private func isAtTop(_ scrollView: UIScrollView) -> Bool {
+            scrollView.contentOffset.y <= topOffset(scrollView) + 0.5
+        }
+
+        private func isAtBottom(_ scrollView: UIScrollView) -> Bool {
+            scrollView.contentOffset.y >= bottomOffset(scrollView) - 0.5
         }
     }
 }

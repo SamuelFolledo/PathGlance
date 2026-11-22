@@ -56,27 +56,37 @@ struct AppTabBar: View {
     ]
 
     var body: some View {
-        // The pill keeps to the middle whatever sits beside it.
-        ZStack {
-            HStack(spacing: 0) {
-                ForEach(items, id: \.id) { item in
-                    button(item)
-                }
-            }
-            .padding(Theme.Spacing.xs)
-            .frame(width: 250, height: Theme.Size.tabBar)
-            // A solid enough backing that rows scrolling underneath do not show through the labels.
-            .background(.regularMaterial, in: .capsule)
-            .glassEffect(.regular, in: .capsule)
-
-            HStack {
+        // The station button sits right at the pill's left edge, portrait or landscape.
+        // An empty space of its size on the other side keeps the pill in the middle;
+        // on a screen too narrow for that, the pair is centered instead.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Theme.Spacing.sm) {
                 stationButton
-                Spacer()
+                pill
+                Color.clear.frame(width: Theme.Size.tabBar, height: Theme.Size.tabBar)
+            }
+            HStack(spacing: Theme.Spacing.sm) {
+                stationButton
+                pill
             }
         }
-        .padding(.horizontal, Theme.Spacing.contentSide)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Theme.Spacing.xs)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
+
+    private var pill: some View {
+        HStack(spacing: 0) {
+            ForEach(items, id: \.id) { item in
+                button(item)
+            }
+        }
+        .padding(Theme.Spacing.xs)
+        .frame(width: 250, height: Theme.Size.tabBar)
+        // A solid enough backing that rows scrolling underneath do not show through the labels.
+        .background(.regularMaterial, in: .capsule)
+        .glassEffect(.regular, in: .capsule)
     }
 
     private var stationButton: some View {

@@ -183,7 +183,7 @@ struct WidgetView: View {
     }
 }
 
-/// The looks to start from, each drawn as it would appear, then the last custom look saved.
+/// The last custom look saved, then the looks to start from, each drawn as it would appear.
 struct PresetsView: View {
     let close: () -> Void
 
@@ -191,12 +191,14 @@ struct PresetsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Your own look comes first once there is one: the list below it is long.
+            if let custom = model.customPreset {
+                row(name: "Custom", detail: "Saved \(PathFormat.dayTime(custom.savedAt))", look: custom.look, id: "custom")
+            }
             ForEach(WidgetPreset.builtIn) { preset in
                 row(name: preset.name, detail: preset.detail, look: preset.look, id: preset.id)
             }
-            if let custom = model.customPreset {
-                row(name: "Custom", detail: "Saved \(PathFormat.dayTime(custom.savedAt))", look: custom.look, id: "custom")
-            } else {
+            if model.customPreset == nil {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "circle.dashed")
                         .font(.title3)

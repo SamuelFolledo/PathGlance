@@ -77,6 +77,14 @@ final class PathScheduleUITests: XCTestCase {
         if !newport.isSelected { newport.tap() }
         shot("02-favorites-sheet")
         XCTAssertTrue(app.buttons["tab-issues"].exists, "The tab bar stays in view over a sheet")
+        // Dragging the content, not the title, brings the last row up clear of the tab bar.
+        let last = app.buttons["favorite-thirtyThirdStreet"]
+        let tabBarTop = app.buttons["tab-issues"].frame.minY
+        for _ in 0..<4 where !(last.exists && last.frame.maxY <= tabBarTop) {
+            newport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05, thenDragTo: newport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -5)))
+        }
+        XCTAssertTrue(last.exists && last.frame.maxY <= tabBarTop, "The sheet's content scrolls until its end is above the tab bar")
+        shot("02b-favorites-scrolled")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Newport"].waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
         shot("03-columns")
@@ -165,7 +173,7 @@ final class PathScheduleUITests: XCTestCase {
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
 
         // Editing it makes it a custom look, which Save keeps as the custom preset.
-        let serif = app.buttons["font-serif"]
+        let serif = app.buttons["font-condensed"]
         reveal(serif)
         serif.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5))
@@ -207,13 +215,29 @@ final class PathScheduleUITests: XCTestCase {
         shot("13-restore-guide")
         app.buttons["guideConfirm"].tap()
 
-        // Back at the top of the content, a pull down takes the sheet to half height...
-        let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
-        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
-        for _ in 0..<8 where !station.isHittable { middle.press(forDuration: 0.05, thenDragTo: lower) }
-        let full = station.frame.minY
-        middle.press(forDuration: 0.05, thenDragTo: lower, withVelocity: .fast, thenHoldForDuration: 0)
-        XCTAssertGreaterThan(station.frame.minY, full + 100, "Pulling the content down from its top should lower the sheet")
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForNonExistence(timeout: 5))
+
+        // Small pulls on the content scroll it back to its top without lowering the sheet.
+        // (`isHittable` is true for a row scrolled out under the title, so go by where it is.)
+        let title = app.staticTexts["Settings"].firstMatch
+        func pull(_ distance: CGFloat, fast: Bool = false) {
+            let start = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 160))
+            let end = start.withOffset(CGVector(dx: 0, dy: distance))
+            if fast {
+                start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
+            } else {
+                start.press(forDuration: 0.05, thenDragTo: end)
+            }
+        }
+        for _ in 0..<20 where station.frame.minY < title.frame.maxY { pull(110) }
+        XCTAssertGreaterThan(station.frame.minY, title.frame.maxY, "A pull down scrolls the content back to its top")
+        // (The last of those may have carried the sheet down a step; the title takes it back up.)
+        title.swipeUp(velocity: .fast)
+        // From the top of the content, a pull down takes the sheet to half height...
+        let full = title.frame.minY
+        pull(300, fast: true)
+        shot("13b-after-pull-down")
+        XCTAssertGreaterThan(title.frame.minY, full + 100, "Pulling the content down from its top should lower the sheet")
         // ...and a quick, short pull on the title closes it. It must never go up.
         app.staticTexts["Settings"].firstMatch.swipeDown(velocity: .fast)
         XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Pulling down at half height should close the sheet")
