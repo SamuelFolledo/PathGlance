@@ -126,6 +126,42 @@ struct ScheduleData: Codable, Sendable {
         return minutes.map { train.time.addingTimeInterval(TimeInterval($0 * 60)) }
     }
 
+    /// Typical minutes from `origin` to `stop` for a train with this routing.
+    func rideMinutes(from origin: Station, to stop: Station, downstream: Int) -> Int? {
+        guard let travel else { return nil }
+        return travel[ScheduleData.travelKey(from: origin, to: stop, downstream: downstream)]
+            ?? travel[ScheduleData.travelKey(from: origin, to: stop, downstream: nil)]
+    }
+
+    /// Every stop `train` makes after `origin`, in order, with its arrival time there.
+    func stops(of train: TrainTime, from origin: Station) -> [(station: Station, time: Date)] {
+        Station.allCases
+            .filter { train.serves($0) && $0 != origin }
+            .compactMap { stop -> (station: Station, time: Date)? in
+                guard let minutes = rideMinutes(from: origin, to: stop, downstream: train.downstream) else { return nil }
+                return (stop, train.time.addingTimeInterval(TimeInterval(minutes * 60)))
+            }
+            .sorted { $0.time < $1.time }
+    }
+
+    /// Where `train` ends its run.
+    func terminal(of train: TrainTime, from origin: Station) -> Station? {
+        stops(of: train, from: origin).last?.station
+    }
+
+    /// True for the Journal Square to 33rd Street trains that detour through Hoboken:
+    /// the train calls at Hoboken and carries on.
+    func runsViaHoboken(_ train: TrainTime, from origin: Station) -> Bool {
+        guard origin != .hoboken, train.serves(.hoboken), let terminal = terminal(of: train, from: origin) else { return false }
+        return terminal != .hoboken
+    }
+
+    /// "J Sq via Hob", "J Sq", "Hoboken": where the train is going, for list dividers.
+    func routeName(of train: TrainTime, from origin: Station) -> String {
+        guard let terminal = terminal(of: train, from: origin) else { return "" }
+        return runsViaHoboken(train, from: origin) ? "\(terminal.shortName) via Hob" : terminal.shortName
+    }
+
     /// Whether any train from `origin` later stops at `target`.
     func reaches(from origin: Station, to target: Station) -> Bool {
         origin != target && (departures[origin.rawValue] ?? []).contains { $0.downstream & target.bit != 0 }

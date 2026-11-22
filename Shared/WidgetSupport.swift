@@ -18,13 +18,15 @@ enum WidgetFontStyle: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    private var sizes: (header: CGFloat, body: CGFloat) {
+    private func sizes(_ density: WidgetDensity) -> (header: CGFloat, body: CGFloat) {
+        let compact: (header: CGFloat, body: CGFloat)
         switch self {
-        case .standard, .rounded: return (10, 15)
-        case .monospaced: return (9, 12)
-        case .condensed: return (10, 16)
-        case .serif: return (10, 14)
+        case .standard, .rounded: compact = (10, 15)
+        case .monospaced: compact = (9, 12)
+        case .condensed: compact = (10, 16)
+        case .serif: compact = (10, 14)
         }
+        return density == .compact ? compact : (compact.header + 1, compact.body + 3)
     }
 
     private var design: Font.Design {
@@ -41,8 +43,51 @@ enum WidgetFontStyle: String, CaseIterable, Identifiable, Sendable {
         return self == .condensed ? font.width(.condensed) : font.monospacedDigit()
     }
 
-    var headerFont: Font { font(size: sizes.header, weight: .medium) }
-    var bodyFont: Font { font(size: sizes.body, weight: .medium) }
+    /// Always smaller than `bodyFont`.
+    func headerFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).header, weight: .medium) }
+    func bodyFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).body, weight: .medium) }
+}
+
+/// The train lines of a board, drawn as one block of text so every line shrinks by the
+/// same amount when it has to: two lines of different lengths never end up in two sizes.
+/// `tapArea` lays a tap target over each line (a `Link` in the widget, a button in the app).
+struct BoardLinesView<TapArea: View>: View {
+    let board: Board
+    let font: Font
+    @ViewBuilder var tapArea: (BoardLine) -> TapArea
+
+    var body: some View {
+        if board.lines.isEmpty {
+            Text("No upcoming trains")
+                .font(font)
+        } else {
+            Text(board.lines.map(\.text).joined(separator: "\n"))
+                .font(font)
+                .lineLimit(board.lines.count)
+                .minimumScaleFactor(0.4)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(true)
+                .overlay {
+                    VStack(spacing: 0) {
+                        ForEach(board.lines, id: \.self) { line in
+                            tapArea(line)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .accessibilityLabel(line.spokenText)
+                        }
+                    }
+                }
+        }
+    }
+}
+
+extension BoardLine {
+    /// For VoiceOver: "To 33rd Street, running late: 7:16 PM, 7:30 PM".
+    var spokenText: String {
+        let name = target?.name ?? label
+        let status = delay == .none ? "" : (delay == .major ? ", long delay" : ", short delay")
+        return "To \(name)\(status): " + times.map(CompactTimes.clockWithPeriod).joined(separator: ", ")
+    }
 }
 
 /// The refresh button in the widget header. WidgetKit reloads the widget's timeline after

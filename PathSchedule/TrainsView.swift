@@ -1,18 +1,39 @@
 import SwiftUI
 
-/// The home tab: the lock screen preview, then every train from one station towards one
-/// destination on one day. The station, destination and day can all be changed.
+/// The home tab. At the top, the station and a preview of the lock screen widget. Below,
+/// one panel: destination tabs and the date stay pinned while the trains scroll under
+/// them, day after day. Swiping sideways turns to the next destination at the same time
+/// of the same day.
 struct TrainsView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var location: LocationService
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var arrivals: [RealtimeArrival] = []
     @State private var now = Date()
     @State private var dayTypes = DayTypeLog()
-    @State private var showingLockScreenSettings = false
+    @State private var sheet: Sheet?
+    @State private var datePicker: DatePick?
+    /// The page the sideways scroll is on.
+    @State private var page: Station?
 
-    private static let dayRange = -7...14
-    private static let terminals: [Station] = [.thirtyThirdStreet, .worldTradeCenter, .journalSquare, .hoboken, .newark]
+    private enum Sheet: Identifiable {
+        case lockScreen
+        case favorites
+        case stops(TrainTime, target: Station)
+
+        var id: String {
+            switch self {
+            case .lockScreen: return "lockScreen"
+            case .favorites: return "favorites"
+            case .stops(let train, let target): return "stops-\(train.time.timeIntervalSince1970)-\(target.rawValue)"
+            }
+        }
+    }
+
+    private struct DatePick: Identifiable {
+        let id = "date"
+    }
 
     /// The station the widget shows: pinned, else nearest.
     private var widgetStation: Station {
@@ -23,119 +44,92 @@ struct TrainsView: View {
         model.browseOrigin ?? widgetStation
     }
 
-    /// Segments: the widget's lines first, then the other ends of the lines that call here,
-    /// then any other stop picked from the menu.
     private func destinations(_ schedule: ScheduleData) -> [Station] {
-        var result = BoardRules.widgetTargets(from: origin, favorites: model.favoriteTargets, schedule: schedule)
-        for station in TrainsView.terminals + [model.browseTarget].compactMap({ $0 })
-        where !result.contains(station) && schedule.reaches(from: origin, to: station) {
-            result.append(station)
-        }
-        return result
+        BoardRules.destinations(from: origin, hidden: model.hiddenTargets, schedule: schedule)
     }
 
-    private func target(in destinations: [Station]) -> Station? {
+    private func selected(in destinations: [Station]) -> Station? {
         if let chosen = model.browseTarget, destinations.contains(chosen) { return chosen }
         return destinations.first
     }
 
-    private var viewedDay: Date {
-        let today = PathTime.calendar.startOfDay(for: now)
-        return PathTime.calendar.date(byAdding: .day, value: model.dayOffset, to: today) ?? today
-    }
-
-    private struct Listing {
-        var trains: [TrainTime] = []
-        var delay: DelayLevel = .none
-        var delayMinutes = 0
-    }
-
-    /// Today lists what is still to come, with live times. Other days list the whole day.
-    private func listing(_ schedule: ScheduleData, to target: Station) -> Listing {
-        let ymd = PathTime.ymd(of: viewedDay)
-        if model.dayOffset == 0 {
-            var plan = BoardPlan(station: origin, targets: [target], schedule: schedule, now: now, limit: 600)
-            plan.apply(realtime: arrivals, now: now)
-            plan.apply(issues: model.issues.active, includePlannedWork: false)
-            guard let group = plan.groups.first else { return Listing() }
-            return Listing(trains: group.trains.filter { PathTime.ymd(of: $0.time) == ymd }, delay: group.delay, delayMinutes: group.delayMinutes)
-        }
-        var other = schedule
-        other.dayOverrides = dayTypes.overrides(around: viewedDay)
-        let trains = other.departures(from: origin, to: target, after: viewedDay.addingTimeInterval(-1), limit: 1000)
-        return Listing(trains: trains.filter { PathTime.ymd(of: $0.time) == ymd })
+    /// Scrolled well away from the present: time to offer a way back.
+    private var isAway: Bool {
+        abs(model.listAnchor.timeIntervalSince(now)) > 3 * 60 * 60
     }
 
     var body: some View {
-        NavigationStack {
-            List {
+        VStack(spacing: 8) {
+            topBar
+            if let schedule = model.schedule {
+                // The preview makes way once the list is scrolled off, and on a phone held sideways.
+                if verticalSizeClass != .compact && !isAway {
+                    previewCard(schedule)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                panel(schedule)
+            } else {
+                emptyState
+            }
+        }
+        .animation(.snappy, value: isAway)
+        .background(Color(.systemGroupedBackground))
+        .overlay(alignment: .bottomTrailing) {
+            if isAway {
+                Button {
+                    model.jump(to: Date())
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.headline)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.glass)
+                .padding(.trailing, 16)
+                .padding(.bottom, 12)
+                .accessibilityLabel("Back to now")
+                .accessibilityIdentifier("backToNow")
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .appSheet(item: $sheet, title: sheetTitle) { sheet in
+            switch sheet {
+            case .lockScreen:
+                LockScreenOptionsView()
+            case .favorites:
+                FavoriteStopsView()
+            case .stops(let train, let target):
                 if let schedule = model.schedule {
-                    let destinations = destinations(schedule)
-                    let target = target(in: destinations)
-                    Section {
-                        previewCard(schedule)
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
-                    Section {
-                        destinationPicker(destinations, selected: target, schedule: schedule)
-                        dayRow
-                    }
-                    .listRowSeparator(.hidden)
-                    if let target {
-                        trainSections(schedule, target: target)
-                    }
-                } else {
-                    Section {
-                        Text(model.isImporting ? "Downloading the timetable…" : "No timetable yet.")
-                            .foregroundStyle(.secondary)
-                        if let error = model.errorMessage {
-                            Text(error)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                        Button("Download timetable") {
-                            Task { await model.downloadSchedule() }
-                        }
-                        .disabled(model.isImporting)
-                    }
+                    StopsView(schedule: schedule, origin: origin, target: target, train: train)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    originMenu
-                }
+        }
+        .appSheet(item: $datePicker, style: .popup, title: { _ in "Go to date" }) { _ in
+            DateJumpView(now: now) { date in
+                datePicker = nil
+                model.jump(to: date)
             }
-            // A sideways swipe moves between destinations.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 40).onEnded { drag in
-                    guard abs(drag.translation.width) > 80, abs(drag.translation.width) > abs(drag.translation.height) * 2 else { return }
-                    stepDestination(by: drag.translation.width < 0 ? 1 : -1)
-                }
-            )
-            .refreshable {
-                await reload()
-                await model.refreshIssues()
-            }
-            .task(id: origin) {
+        }
+        .task(id: origin) {
+            await reload()
+        }
+        .task {
+            // Keep "now" and the live times fresh while the tab is open.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
                 await reload()
             }
-            .sheet(isPresented: $showingLockScreenSettings) {
-                NavigationStack {
-                    List {
-                        LockScreenSettings()
-                    }
-                    .navigationTitle("Lock screen")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showingLockScreenSettings = false }
-                        }
-                    }
-                }
-                .presentationDetents([.medium, .large])
-            }
+        }
+        .onChange(of: model.resetCount[.trains]) {
+            sheet = nil
+            datePicker = nil
+        }
+    }
+
+    private func sheetTitle(_ sheet: Sheet) -> String {
+        switch sheet {
+        case .lockScreen: return "Lock screen widget"
+        case .favorites: return "Favorite stops"
+        case .stops(let train, _): return "\(CompactTimes.clockWithPeriod(train.time)) from \(origin.shortName)"
         }
     }
 
@@ -147,62 +141,72 @@ struct TrainsView: View {
         }
     }
 
-    private func stepDestination(by step: Int) {
-        guard let schedule = model.schedule else { return }
-        let all = destinations(schedule)
-        guard let current = target(in: all), let index = all.firstIndex(of: current),
-              all.indices.contains(index + step) else { return }
-        withAnimation { model.browseTarget = all[index + step] }
-    }
-
     // MARK: Pieces
 
-    /// Station name in the title bar; tap to board somewhere else.
-    private var originMenu: some View {
-        Menu {
-            Button {
-                model.browseOrigin = nil
-            } label: {
-                Label("\(widgetStation.name) (\(model.manualStation == nil ? "nearest" : "pinned"))",
-                      systemImage: model.browseOrigin == nil ? "checkmark" : "location")
-            }
-            Divider()
-            ForEach(Station.allCases) { station in
+    /// "From Journal Square" opens the station list; the star edits favorite stops.
+    private var topBar: some View {
+        HStack {
+            Menu {
                 Button {
-                    model.browseOrigin = station
+                    model.browseOrigin = nil
                 } label: {
-                    if model.browseOrigin == station {
-                        Label(station.name, systemImage: "checkmark")
-                    } else {
-                        Text(station.name)
+                    Label("\(widgetStation.name) (\(model.manualStation == nil ? "nearest" : "pinned"))",
+                          systemImage: model.browseOrigin == nil ? "checkmark" : "location")
+                }
+                Divider()
+                ForEach(Station.allCases) { station in
+                    Button {
+                        model.browseOrigin = station
+                    } label: {
+                        if model.browseOrigin == station {
+                            Label(station.name, systemImage: "checkmark")
+                        } else {
+                            Text(station.name)
+                        }
                     }
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("From \(origin.name)")
+                        .font(.title3.weight(.bold))
+                    Image(systemName: "chevron.down")
+                        .font(.footnote.weight(.bold))
+                }
+                .foregroundStyle(.primary)
             }
-        } label: {
-            HStack(spacing: 4) {
-                Text("From \(origin.name)")
-                    .font(.headline)
-                Image(systemName: "chevron.down")
-                    .font(.caption.weight(.semibold))
+            .accessibilityLabel("From \(origin.name). Change station")
+            .accessibilityIdentifier("originMenu")
+            Spacer()
+            Button {
+                sheet = .favorites
+            } label: {
+                Image(systemName: model.favoriteStops.isEmpty ? "star" : "star.fill")
+                    .frame(width: 32, height: 32)
             }
-            .foregroundStyle(.primary)
+            .buttonStyle(.glass)
+            .accessibilityLabel("Favorite stops")
+            .accessibilityIdentifier("favoritesButton")
+            .infoPopover("Favorite stops", "Each favorite stop gets a column of arrival times in the list.", "A stop only shows when trains to the chosen destination call there.")
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
-    /// What the lock screen widget shows right now. Tap for its settings.
+    /// What the lock screen widget shows right now. The top row opens its options; a line
+    /// turns the list to that destination.
     private func previewCard(_ schedule: ScheduleData) -> some View {
         let station = widgetStation
-        let targets = BoardRules.widgetTargets(from: station, favorites: model.favoriteTargets, schedule: schedule)
-        var plan = BoardPlan(station: station, targets: targets, schedule: schedule, now: now)
-        plan.showArrival = model.showArrivalOnWidget
+        var plan = BoardPlan(station: station, targets: BoardRules.widgetTargets(from: station, hidden: model.hiddenTargets),
+                             schedule: schedule, now: now)
+        plan.style = model.widgetStyle
         plan.apply(realtime: arrivals, now: now)
         plan.apply(issues: model.issues.active, includePlannedWork: model.plannedWorkOnLockScreen)
         let board = plan.board(at: now)
 
-        return Button {
-            showingLockScreenSettings = true
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 4) {
+            Button {
+                sheet = .lockScreen
+            } label: {
                 HStack(spacing: 4) {
                     Text("From \(station.shortName): \(CompactTimes.clockWithPeriod(now))")
                     Image(systemName: "arrow.clockwise")
@@ -216,149 +220,206 @@ struct TrainsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .font(model.fontStyle.font(size: 12))
-                if board.lines.isEmpty {
-                    Text("No upcoming trains")
-                }
-                ForEach(board.lines, id: \.self) { line in
-                    Text(line.text)
-                }
+                .contentShape(.rect)
             }
-            .font(model.fontStyle.font(size: 18))
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .contentShape(.rect)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Lock screen widget preview. Change how it looks")
+            .accessibilityIdentifier("lockScreenPreview")
+            BoardLinesView(board: board, font: model.fontStyle.font(size: model.widgetStyle.density == .compact ? 18 : 21)) { line in
+                Button {
+                    if let target = line.target { model.open(origin: station, target: target) }
+                } label: {
+                    Color.clear.contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .padding(.horizontal, 12)
+        .infoPopover("Lock screen preview",
+                     "This is what the widget shows right now.",
+                     "Tap the top row to change its look.",
+                     "Tap a line to list that destination's trains.",
+                     "A ? after a line means a short delay, ! a long one.")
     }
 
-    private func destinationPicker(_ destinations: [Station], selected: Station?, schedule: ScheduleData) -> some View {
-        HStack(spacing: 8) {
+    /// Destination tabs fixed at the top of one surface, the lists paging beneath.
+    private func panel(_ schedule: ScheduleData) -> some View {
+        let destinations = destinations(schedule)
+        let current = selected(in: destinations)
+
+        return VStack(spacing: 0) {
             Picker("Destination", selection: Binding(
-                get: { selected ?? origin },
-                set: { model.browseTarget = $0 }
+                get: { current ?? origin },
+                set: { target in
+                    model.browseTarget = target
+                    withAnimation(.snappy) { page = target }
+                }
             )) {
                 ForEach(destinations) { station in
-                    Text(station.lineLabel).tag(station)
+                    Text(station.lineLabel)
+                        .accessibilityLabel(station.name)
+                        .tag(station)
                 }
             }
             .pickerStyle(.segmented)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .accessibilityIdentifier("destinationPicker")
 
-            // Any other stop a train from here reaches.
-            Menu {
-                ForEach(Station.allCases.filter { schedule.reaches(from: origin, to: $0) && !destinations.contains($0) }) { station in
-                    Button(station.name) { model.browseTarget = station }
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-        }
-    }
-
-    private var dayRow: some View {
-        HStack {
-            Button {
-                model.dayOffset -= 1
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .disabled(model.dayOffset <= TrainsView.dayRange.lowerBound)
-
-            Spacer()
-            Button {
-                model.dayOffset = 0
-            } label: {
-                VStack(spacing: 0) {
-                    Text(dayTitle)
-                        .font(.subheadline.weight(.semibold))
-                    if let holiday = Holiday.on(ymd: PathTime.ymd(of: viewedDay)) {
-                        Text(holiday.name)
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(destinations, id: \.self) { target in
+                        TrainListPage(origin: origin, target: target, isSelected: target == current, now: now,
+                                      arrivals: arrivals, dayTypes: dayTypes,
+                                      onSelectTrain: { sheet = .stops($0, target: target) },
+                                      onPickDate: { datePicker = DatePick() })
+                            .containerRelativeFrame(.horizontal)
                     }
                 }
+                .scrollTargetLayout()
             }
-            .buttonStyle(.plain)
-            Spacer()
-
-            Button {
-                model.dayOffset += 1
-            } label: {
-                Image(systemName: "chevron.right")
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            .scrollIndicators(.hidden)
+            .onScrollPhaseChange { _, phase in
+                // Only once the swipe has come to rest: changing the selection while the
+                // page is still moving stops it and it springs back.
+                if phase == .idle, let page, page != current { model.browseTarget = page }
             }
-            .disabled(model.dayOffset >= TrainsView.dayRange.upperBound)
+            .onChange(of: model.browseTarget) { _, target in
+                // A widget line or preview line was tapped.
+                if let target, target != page { page = target }
+            }
+            .onChange(of: origin) {
+                page = selected(in: self.destinations(schedule))
+            }
+            .onAppear {
+                if page == nil { page = current }
+            }
         }
-        .buttonStyle(.glass)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(.rect(topLeadingRadius: 24, topTrailingRadius: 24))
+        .ignoresSafeArea(edges: .bottom)
     }
 
-    private var dayTitle: String {
-        let date = PathFormat.day(viewedDay)
-        switch model.dayOffset {
-        case 0: return "Today · \(date)"
-        case 1: return "Tomorrow · \(date)"
-        case -1: return "Yesterday · \(date)"
-        default: return date
-        }
-    }
-
-    @ViewBuilder
-    private func trainSections(_ schedule: ScheduleData, target: Station) -> some View {
-        let listing = listing(schedule, to: target)
-        let relevant = model.dayOffset == 0 ? model.issues.active.filter { $0.affects(from: origin, to: target) } : []
-        let note = dayTypes.resolution(forYMD: PathTime.ymd(of: viewedDay))?.note
-
-        if listing.delayMinutes > 0 || !relevant.isEmpty {
-            Section {
-                if listing.delayMinutes > 0 {
-                    Label("Next train is about \(listing.delayMinutes) min behind the timetable", systemImage: IssueKind.delay.symbolName)
-                        .foregroundStyle(.yellow)
-                }
-                ForEach(relevant) { issue in
-                    IssueRow(issue: issue)
-                }
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Text(model.isImporting ? "Downloading the timetable…" : "No timetable yet.")
+                .foregroundStyle(.secondary)
+            if let error = model.errorMessage {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
+            Button("Download timetable") {
+                Task { await model.downloadSchedule() }
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(model.isImporting)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
 
-        Section {
-            if listing.trains.isEmpty {
-                Text(model.dayOffset == 0 ? "No more trains today." : "No trains on this day.")
+/// Every stop one train makes, with its arrival time.
+struct StopsView: View {
+    let schedule: ScheduleData
+    let origin: Station
+    let target: Station
+    let train: TrainTime
+
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        let stops = schedule.stops(of: train, from: origin)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(schedule.routeName(of: train, from: origin).isEmpty ? "" : "To \(schedule.routeName(of: train, from: origin))" + (train.isLive ? " · live departure" : ""))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 8)
+            stopRow(name: origin.name, time: train.time, isFavorite: false, isEnd: false, isOrigin: true)
+            ForEach(stops, id: \.station) { stop in
+                stopRow(name: stop.station.name, time: stop.time,
+                        isFavorite: model.favoriteStops.contains(stop.station),
+                        isEnd: stop.station == target, isOrigin: false)
+            }
+            if stops.isEmpty {
+                Text("Stop times are not available for this train.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .padding(.top, 8)
             }
-            ForEach(listing.trains, id: \.self) { train in
-                HStack {
-                    Text(CompactTimes.clockWithPeriod(train.time))
-                        .font(.body.weight(.medium))
-                        .monospacedDigit()
-                    if train.isLive {
-                        Text(listing.delay == .none ? "Live" : "Live · late")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(listing.delay == .none ? .green : .yellow)
-                    }
-                    Spacer()
-                    if let arrival = schedule.arrival(of: train, from: origin, to: target) {
-                        Text("\(target.shortName) \(CompactTimes.clockWithPeriod(arrival))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                }
+        }
+    }
+
+    private func stopRow(name: String, time: Date, isFavorite: Bool, isEnd: Bool, isOrigin: Bool) -> some View {
+        HStack {
+            Image(systemName: isOrigin ? "circle.fill" : (isEnd ? "mappin.circle.fill" : "circle"))
+                .font(.caption)
+                .foregroundStyle(isOrigin || isEnd ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text(name)
+                .fontWeight(isOrigin || isEnd ? .semibold : .regular)
+            if isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.caption)
+                    .foregroundStyle(.yellow)
+                    .accessibilityLabel("Favorite")
             }
-        } header: {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Departs \(origin.shortName)")
-                    Spacer()
-                    Text("Arrives")
+            Spacer()
+            Text(CompactTimes.clockWithPeriod(time))
+                .monospacedDigit()
+                .foregroundStyle(isOrigin || isEnd ? .primary : .secondary)
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A month calendar for jumping the list to another day.
+struct DateJumpView: View {
+    let now: Date
+    let onPick: (Date) -> Void
+
+    @State private var date: Date
+
+    init(now: Date, onPick: @escaping (Date) -> Void) {
+        self.now = now
+        self.onPick = onPick
+        _date = State(initialValue: now)
+    }
+
+    private var range: ClosedRange<Date> {
+        let calendar = PathTime.calendar
+        let today = calendar.startOfDay(for: now)
+        let first = calendar.date(byAdding: .day, value: -AppModel.daysBack, to: today) ?? today
+        let last = calendar.date(byAdding: .day, value: AppModel.daysAhead, to: today) ?? today
+        return first...last
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            DatePicker("Date", selection: $date, in: range, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .environment(\.timeZone, PathTime.calendar.timeZone)
+                .environment(\.calendar, PathTime.calendar)
+                .onChange(of: date) { _, picked in
+                    // Today lands on the next train; any other day on its first.
+                    let isToday = PathTime.ymd(of: picked) == PathTime.ymd(of: now)
+                    onPick(isToday ? Date() : PathTime.calendar.startOfDay(for: picked))
                 }
-                if let note {
-                    Label(note, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .textCase(nil)
-                }
+            Button("Back to now") {
+                onPick(Date())
             }
+            .buttonStyle(.glass)
         }
     }
 }

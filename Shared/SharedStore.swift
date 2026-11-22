@@ -83,17 +83,31 @@ enum SharedStore {
         set { defaults.set(newValue, forKey: "plannedWorkOnLockScreen") }
     }
 
-    /// Destinations the widget should list when trains from the current station reach
-    /// them, in order of preference. Empty means the built-in rules for each station.
-    static var favoriteTargets: [Station] {
-        get { (defaults.stringArray(forKey: "favoriteTargets") ?? []).compactMap(Station.init(rawValue:)) }
-        set { defaults.set(newValue.map(\.rawValue), forKey: "favoriteTargets") }
+    /// Stops the user cares about. The Trains tab shows a column of arrival times for each.
+    static var favoriteStops: [Station] {
+        get { (defaults.stringArray(forKey: "favoriteStops") ?? []).compactMap(Station.init(rawValue:)) }
+        set { defaults.set(newValue.map(\.rawValue), forKey: "favoriteStops") }
     }
 
-    /// Show when the first train on each widget line reaches its destination. Off by default.
-    static var showArrivalOnWidget: Bool {
-        get { defaults.bool(forKey: "showArrivalOnWidget") }
-        set { defaults.set(newValue, forKey: "showArrivalOnWidget") }
+    /// Destinations the user has turned off, on the widget and in the app's tabs.
+    static var hiddenTargets: Set<Station> {
+        get { Set((defaults.stringArray(forKey: "hiddenTargets") ?? []).compactMap(Station.init(rawValue:))) }
+        set { defaults.set(newValue.map(\.rawValue).sorted(), forKey: "hiddenTargets") }
+    }
+
+    static var widgetStyle: WidgetStyle {
+        get {
+            WidgetStyle(
+                density: defaults.string(forKey: "widgetDensity").flatMap(WidgetDensity.init(rawValue:)) ?? .compact,
+                timeFormat: defaults.string(forKey: "widgetTimeFormat").flatMap(WidgetTimeFormat.init(rawValue:)) ?? .full,
+                showArrival: defaults.bool(forKey: "showArrivalOnWidget")
+            )
+        }
+        set {
+            defaults.set(newValue.density.rawValue, forKey: "widgetDensity")
+            defaults.set(newValue.timeFormat.rawValue, forKey: "widgetTimeFormat")
+            defaults.set(newValue.showArrival, forKey: "showArrivalOnWidget")
+        }
     }
 
     static var fontStyle: WidgetFontStyle {

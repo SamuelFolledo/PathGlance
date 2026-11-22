@@ -26,9 +26,11 @@ struct BoardLine: Hashable, Sendable {
     var target: Station?
     /// When the first train reaches `target`, if the widget is set to show it.
     var arrival: Date?
+    var timeFormat: WidgetTimeFormat = .full
 
-    /// "7:16 :30 :50", or "7:16→:35 :30 :50" with the first train's arrival time.
-    var timesText: String { CompactTimes.string(times, arrivalOfFirst: arrival) }
+    /// "7:16, 7:30, 7:50" or "7:16 :30 :50". With the first train's arrival time:
+    /// "7:16→7:35, 7:30".
+    var timesText: String { CompactTimes.string(times, arrivalOfFirst: arrival, format: timeFormat) }
 
     /// "33rd? 7:16 :30 :50 8:00 :10"
     var text: String {
@@ -67,16 +69,63 @@ enum BoardRules {
 }
 
 extension BoardRules {
-    /// The widget's lines: the user's favourite destinations that trains from `station`
-    /// reach, topped up from the station's rules. With no favourites it is the rules alone.
-    static func widgetTargets(from station: Station, favorites: [Station], schedule: ScheduleData) -> [Station] {
+    /// The ends of the lines, which is what a destination tab or widget line can be.
+    static let terminals: [Station] = [.thirtyThirdStreet, .worldTradeCenter, .journalSquare, .hoboken, .newark]
+
+    /// The widget's lines: the station's rules without the destinations the user has
+    /// turned off. If that would leave nothing, the rules stand.
+    static func widgetTargets(from station: Station, hidden: Set<Station>) -> [Station] {
         let rules = targets(from: station)
-        var result = Array(favorites.filter { schedule.reaches(from: station, to: $0) }.prefix(2))
-        guard !result.isEmpty else { return rules }
-        for target in rules where result.count < 2 && !result.contains(target) {
-            result.append(target)
+        let kept = rules.filter { !hidden.contains($0) }
+        return kept.isEmpty ? rules : kept
+    }
+
+    /// The destination tabs in the app: the widget's lines, then the other line ends
+    /// trains from `station` reach, without the ones turned off.
+    static func destinations(from station: Station, hidden: Set<Station>, schedule: ScheduleData) -> [Station] {
+        var result = widgetTargets(from: station, hidden: hidden)
+        for terminal in terminals where !result.contains(terminal) && !hidden.contains(terminal)
+            && schedule.reaches(from: station, to: terminal) {
+            result.append(terminal)
         }
         return result
+    }
+}
+
+/// How the widget writes its times.
+enum WidgetTimeFormat: String, CaseIterable, Identifiable, Sendable {
+    /// "10:16, 10:35, 10:55"
+    case full
+    /// "10:16 :35 :55"
+    case short
+
+    var id: String { rawValue }
+    var name: String { self == .full ? "Full" : "Shortened" }
+    var example: String { self == .full ? "10:16, 10:35, 10:55" : "10:16 :35 :55" }
+}
+
+/// How much the widget fits in.
+enum WidgetDensity: String, CaseIterable, Identifiable, Sendable {
+    case compact, regular
+
+    var id: String { rawValue }
+    var name: String { self == .compact ? "Compact" : "Regular" }
+    var detail: String { self == .compact ? "Smaller text, more trains" : "Larger text, fewer trains" }
+}
+
+struct WidgetStyle: Hashable, Sendable {
+    var density: WidgetDensity = .compact
+    var timeFormat: WidgetTimeFormat = .full
+    var showArrival = false
+
+    /// Train times on each line.
+    var timesPerLine: Int {
+        switch (timeFormat, density) {
+        case (.short, .compact): return 5
+        case (.short, .regular): return 4
+        case (.full, .compact): return 4
+        case (.full, .regular): return 3
+        }
     }
 }
 
@@ -94,7 +143,12 @@ enum CompactTimes {
     }
 
     /// "7:10 :30 :50 8:00 :10". The hour is dropped when it repeats.
-    static func string(_ times: [Date], arrivalOfFirst: Date? = nil) -> String {
+    static func string(_ times: [Date], arrivalOfFirst: Date? = nil, format: WidgetTimeFormat = .short) -> String {
+        if format == .full {
+            return times.enumerated().map { index, time in
+                index == 0 ? clock(time) + (arrivalOfFirst.map { "→" + clock($0) } ?? "") : clock(time)
+            }.joined(separator: ", ")
+        }
         var parts: [String] = []
         var lastHour: Int?
         func short(_ time: Date) -> String {
@@ -146,8 +200,7 @@ struct BoardPlan: Sendable {
     let station: Station
     var groups: [Group]
     var hasAlert = false
-    /// Put the first train's arrival time at its destination on each line.
-    var showArrival = false
+    var style = WidgetStyle()
     private let schedule: ScheduleData
 
     /// `targets` defaults to the station's board rules.
@@ -222,7 +275,8 @@ struct BoardPlan: Sendable {
         }
     }
 
-    func board(at date: Date, perLine: Int = 5) -> Board {
+    func board(at date: Date) -> Board {
+        let perLine = style.timesPerLine
         let visibleFrom = date.addingTimeInterval(-BoardPlan.grace)
         let upcoming = groups
             .map { group -> Group in
@@ -246,13 +300,15 @@ struct BoardPlan: Sendable {
                 && a.allSatisfy { $0.serves(second.target) }
                 && b.allSatisfy { $0.serves(first.target) }
             if sameTrains {
+                // One set of trains for two destinations: name both, as in "JSQ+HOB".
                 var both = first
                 both.delay = max(first.delay, second.delay)
-                return Board(station: station, lines: filled(label: "All", group: both, perLine: perLine), hasAlert: hasAlert)
+                let label = "\(first.target.lineLabel)+\(second.target.lineLabel)"
+                return Board(station: station, lines: filled(label: label, group: both, perLine: perLine), hasAlert: hasAlert)
             }
             return Board(station: station, lines: [
-                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target, arrival: arrival(in: first)),
-                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target, arrival: arrival(in: second)),
+                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target, arrival: arrival(in: first), timeFormat: style.timeFormat),
+                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target, arrival: arrival(in: second), timeFormat: style.timeFormat),
             ], hasAlert: hasAlert)
         }
 
@@ -260,7 +316,7 @@ struct BoardPlan: Sendable {
     }
 
     private func arrival(in group: Group) -> Date? {
-        guard showArrival, let train = group.trains.first else { return nil }
+        guard style.showArrival, let train = group.trains.first else { return nil }
         return schedule.arrival(of: train, from: station, to: group.target)
     }
 
@@ -268,9 +324,9 @@ struct BoardPlan: Sendable {
         let times = group.trains.map(\.time)
         let firstLine = Array(times.prefix(perLine))
         let secondLine = Array(times.dropFirst(perLine).prefix(perLine))
-        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target, arrival: arrival(in: group))]
+        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target, arrival: arrival(in: group), timeFormat: style.timeFormat)]
         if !secondLine.isEmpty {
-            lines.append(BoardLine(label: "", times: secondLine, target: group.target))
+            lines.append(BoardLine(label: "", times: secondLine, target: group.target, timeFormat: style.timeFormat))
         }
         return lines
     }

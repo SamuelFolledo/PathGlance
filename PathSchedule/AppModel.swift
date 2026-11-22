@@ -10,60 +10,62 @@ enum AppTab: Hashable {
 @MainActor
 final class AppModel: ObservableObject {
     nonisolated static let refreshTaskID = "com.samuelfolledo.PathSchedule.refresh"
+    /// How far the Trains tab reaches either side of today.
+    nonisolated static let daysBack = 7
+    nonisolated static let daysAhead = 14
 
     @Published private(set) var schedule: ScheduleData?
     @Published private(set) var issues = IssueLog()
     @Published private(set) var isImporting = false
     @Published var errorMessage: String?
-    @Published var tab: AppTab = .trains
+
+    // MARK: Navigation
+
+    @Published private(set) var tab: AppTab = .trains
+    /// Goes up when the tab already showing is tapped again: its list returns to the top
+    /// and any sheet over it closes.
+    @Published private(set) var resetCount: [AppTab: Int] = [:]
 
     // What the Trains tab is showing.
     /// `nil` follows the widget's station (pinned or nearest).
     @Published var browseOrigin: Station?
     @Published var browseTarget: Station?
-    /// Days from today: -7 through 14.
-    @Published var dayOffset = 0
+    /// The time at the top of the train list. Every destination's list keeps to it, so
+    /// switching destination stays on the same day and hour.
+    @Published var listAnchor = Date()
+    /// Goes up when the lists should move to `listAnchor` (a jump to a date, back to now).
+    @Published private(set) var jumpCount = 0
 
-    @Published var favoriteTargets: [Station] {
-        didSet {
-            SharedStore.favoriteTargets = favoriteTargets
-            reloadWidgets()
-        }
-    }
-
-    @Published var showArrivalOnWidget: Bool {
-        didSet {
-            SharedStore.showArrivalOnWidget = showArrivalOnWidget
-            reloadWidgets()
-        }
-    }
+    // MARK: Preferences
 
     @Published var manualStation: Station? {
-        didSet {
-            SharedStore.manualStation = manualStation
-            reloadWidgets()
-        }
+        didSet { SharedStore.manualStation = manualStation; reloadWidgets() }
     }
 
     @Published var useRealtime: Bool {
-        didSet {
-            SharedStore.useRealtime = useRealtime
-            reloadWidgets()
-        }
+        didSet { SharedStore.useRealtime = useRealtime; reloadWidgets() }
     }
 
     @Published var plannedWorkOnLockScreen: Bool {
-        didSet {
-            SharedStore.plannedWorkOnLockScreen = plannedWorkOnLockScreen
-            reloadWidgets()
-        }
+        didSet { SharedStore.plannedWorkOnLockScreen = plannedWorkOnLockScreen; reloadWidgets() }
     }
 
     @Published var fontStyle: WidgetFontStyle {
-        didSet {
-            SharedStore.fontStyle = fontStyle
-            reloadWidgets()
-        }
+        didSet { SharedStore.fontStyle = fontStyle; reloadWidgets() }
+    }
+
+    @Published var widgetStyle: WidgetStyle {
+        didSet { SharedStore.widgetStyle = widgetStyle; reloadWidgets() }
+    }
+
+    /// Stops that get an arrival-time column in the Trains tab.
+    @Published var favoriteStops: [Station] {
+        didSet { SharedStore.favoriteStops = favoriteStops }
+    }
+
+    /// Destinations turned off on the widget and in the destination tabs.
+    @Published var hiddenTargets: Set<Station> {
+        didSet { SharedStore.hiddenTargets = hiddenTargets; reloadWidgets() }
     }
 
     init() {
@@ -73,9 +75,10 @@ final class AppModel: ObservableObject {
         useRealtime = SharedStore.useRealtime
         plannedWorkOnLockScreen = SharedStore.plannedWorkOnLockScreen
         fontStyle = SharedStore.fontStyle
-        favoriteTargets = SharedStore.favoriteTargets
-        showArrivalOnWidget = SharedStore.showArrivalOnWidget
-        // "-startTab issues" on the command line opens on that tab, for screenshots.
+        widgetStyle = SharedStore.widgetStyle
+        favoriteStops = SharedStore.favoriteStops
+        hiddenTargets = SharedStore.hiddenTargets
+        // "-startTab issues" on the command line opens on that tab, for screenshots and UI tests.
         switch UserDefaults.standard.string(forKey: "startTab") {
         case "issues": tab = .issues
         case "settings": tab = .settings
@@ -83,12 +86,40 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Selecting the tab already showing resets it.
+    func select(_ newTab: AppTab) {
+        if newTab == tab {
+            resetCount[newTab, default: 0] += 1
+            if newTab == .trains { jump(to: Date()) }
+        } else {
+            tab = newTab
+        }
+    }
+
     /// Shows today's trains from `origin` towards `target`, as when a widget line is tapped.
     func open(origin: Station, target: Station) {
         browseOrigin = origin
         browseTarget = target
-        dayOffset = 0
         tab = .trains
+        jump(to: Date())
+    }
+
+    /// Moves every train list to `date`.
+    func jump(to date: Date) {
+        listAnchor = date
+        jumpCount += 1
+    }
+
+    func toggleFavorite(_ station: Station) {
+        if let index = favoriteStops.firstIndex(of: station) {
+            favoriteStops.remove(at: index)
+        } else {
+            favoriteStops.append(station)
+        }
+    }
+
+    func setTarget(_ station: Station, shown: Bool) {
+        if shown { hiddenTargets.remove(station) } else { hiddenTargets.insert(station) }
     }
 
     /// Called whenever the app comes to the foreground.

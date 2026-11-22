@@ -10,6 +10,7 @@ struct BoardEntry: TimelineEntry {
     let fetchedAt: Date
     var message: String?
     var fontStyle: WidgetFontStyle = .standard
+    var density: WidgetDensity = .compact
 
     static var sample: BoardEntry {
         let now = Date()
@@ -53,8 +54,9 @@ struct BoardProvider: TimelineProvider {
     private static func build() async -> (entries: [BoardEntry], reload: Date) {
         let now = Date()
         let fontStyle = SharedStore.fontStyle
+        let style = SharedStore.widgetStyle
         guard var schedule = SharedStore.loadSchedule(now: now) else {
-            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle)
+            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle, density: style.density)
             return ([entry], now.addingTimeInterval(30 * 60))
         }
 
@@ -72,9 +74,9 @@ struct BoardProvider: TimelineProvider {
             schedule.dayOverrides = dayTypes.overrides(around: now)
         }
 
-        let targets = BoardRules.widgetTargets(from: station, favorites: SharedStore.favoriteTargets, schedule: schedule)
+        let targets = BoardRules.widgetTargets(from: station, hidden: SharedStore.hiddenTargets)
         var plan = BoardPlan(station: station, targets: targets, schedule: schedule, now: now)
-        plan.showArrival = SharedStore.showArrivalOnWidget
+        plan.style = style
         plan.apply(realtime: arrivals, now: now)
 
         var issues = IssueLog.load()
@@ -91,7 +93,7 @@ struct BoardProvider: TimelineProvider {
         plan.apply(issues: issues.active, includePlannedWork: SharedStore.plannedWorkOnLockScreen)
 
         let entries = plan.refreshDates(from: now).map { date in
-            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle)
+            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle, density: style.density)
         }
         // Reload regularly to pick up a new station and fresh predictions.
         // The app also reloads the widget whenever the station changes.
@@ -134,18 +136,14 @@ struct BoardView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(entry.fontStyle.headerFont)
-                if board.lines.isEmpty {
-                    Text("No upcoming trains")
-                }
-                ForEach(board.lines, id: \.self) { line in
+                .font(entry.fontStyle.headerFont(entry.density))
+                .accessibilityLabel("Trains from \(board.station.name), updated \(CompactTimes.clockWithPeriod(entry.fetchedAt)). Refresh.")
+                BoardLinesView(board: board, font: entry.fontStyle.bodyFont(entry.density)) { line in
+                    // Each line opens its own list of trains in the app.
                     if let target = line.target {
-                        // Each line opens its own list of trains in the app.
                         Link(destination: AppLink.line(from: board.station, to: target)) {
-                            Text(line.text)
+                            Color.clear.contentShape(.rect)
                         }
-                    } else {
-                        Text(line.text)
                     }
                 }
             } else {
@@ -153,7 +151,7 @@ struct BoardView: View {
                     .lineLimit(3)
             }
         }
-        .font(entry.fontStyle.bodyFont)
+        .font(entry.fontStyle.bodyFont(entry.density))
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, alignment: .leading)

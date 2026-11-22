@@ -9,7 +9,9 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: $model.tab) {
+        // Sheets are drawn inside each tab, so the tab bar stays in view and in reach.
+        // Tapping the tab already showing goes through `select` too, which resets it.
+        TabView(selection: Binding(get: { model.tab }, set: { model.select($0) })) {
             Tab("Trains", systemImage: "tram.fill", value: AppTab.trains) {
                 TrainsView()
             }

@@ -40,9 +40,9 @@ WTC 7:08 :14 :20 :26 :32
 
 ## What each station shows
 
-These are the defaults. Settings > Destinations lets you list preferred destinations
-(a line's end or any stop); the widget then shows the first two that trains from the
-current station reach.
+These are the defaults. Settings > Lines shown turns destinations off; a station left
+with one line gives it both widget rows. When the same trains serve both destinations
+they are listed once under a joint label such as `JSQ+HOB`.
 
 | Station | Lines |
 | --- | --- |
@@ -59,13 +59,27 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
 
 ## Layout
 
-- `PathSchedule/` app (iOS 26): three tabs. Trains (lock screen preview, then trains by
-  station, destination and day), Issues (current and archived) and Settings. Also the
-  timetable import and archive, and location
+- `PathSchedule/` app (iOS 26): three tabs. Trains (lock screen preview, then one list per
+  destination with a column per favorite stop, a week back to two weeks ahead), Issues
+  (current and archived) and Settings. Also the timetable import and archive, and location.
+  `UI/` holds the in-tab sheet, the press-and-hold info popover and the radio, check and
+  fold rows.
 - `PathScheduleWidget/` widget extension
 - `Shared/` compiled into both: stations, schedule queries, board rules, real-time feed,
   alerts and the issue log, day-type learning, widget fonts and links
+- `PathScheduleTests/` unit tests. They run the real importer on a made-up timetable
+  (`Fixture.swift`), so they need no network.
+- `PathScheduleUITests/` UI tests that drive the app against PATH's live data.
 - `Config/` entitlements and Info.plists
+
+## Tests
+
+```
+xcodebuild test -scheme PathSchedule -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+Add `-only-testing:PathScheduleTests` for the unit tests alone. Set
+`TEST_RUNNER_SHOT_DIR=/some/folder` to keep a screenshot of each UI test step.
 
 ## Setup
 
