@@ -17,6 +17,17 @@ enum IssueKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// "Delays", "Elevator and escalator notices": the kind in the plural, for settings.
+    var pluralTitle: String {
+        switch self {
+        case .delay: return "Delays"
+        case .suspension: return "Suspensions"
+        case .plannedWork: return "Planned work"
+        case .elevator: return "Elevator and escalator notices"
+        case .other: return "Other notices"
+        }
+    }
+
     var symbolName: String {
         switch self {
         case .delay: return "hourglass"

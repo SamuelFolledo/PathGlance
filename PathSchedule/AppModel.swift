@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 import Combine
 import WidgetKit
 import BackgroundTasks
@@ -13,6 +13,15 @@ final class AppModel: ObservableObject {
     /// How far the Trains tab reaches either side of today.
     nonisolated static let daysBack = 7
     nonisolated static let daysAhead = 14
+
+    /// The text sizes the slider in Settings steps through. The app starts one step above
+    /// the system's standard size.
+    static let textSizes: [DynamicTypeSize] = [.small, .medium, .large, .xLarge, .xxLarge, .xxxLarge, .accessibility1]
+    nonisolated static let defaultTextSizeStep = 3
+
+    var textSize: DynamicTypeSize {
+        AppModel.textSizes[min(max(textSizeStep, 0), AppModel.textSizes.count - 1)]
+    }
 
     @Published private(set) var schedule: ScheduleData?
     @Published private(set) var issues = IssueLog()
@@ -51,9 +60,18 @@ final class AppModel: ObservableObject {
         didSet { SharedStore.useRealtime = useRealtime; reloadWidgets() }
     }
 
-    @Published var plannedWorkOnLockScreen: Bool {
-        didSet { SharedStore.plannedWorkOnLockScreen = plannedWorkOnLockScreen; reloadWidgets() }
+    /// Kinds of issue that are silenced: listed, but not counted and not on the widget.
+    @Published var mutedKinds: Set<IssueKind> {
+        didSet { SharedStore.mutedKinds = mutedKinds; reloadWidgets() }
     }
+
+    /// Text size across the app, as a step on `AppModel.textSizes`.
+    @Published var textSizeStep: Int {
+        didSet { UserDefaults.standard.set(textSizeStep, forKey: "textSizeStep") }
+    }
+
+    /// A question waiting for the user's answer (`ask`).
+    @Published var guide: Guide?
 
     @Published var fontStyle: WidgetFontStyle {
         didSet { SharedStore.fontStyle = fontStyle; reloadWidgets() }
@@ -78,7 +96,8 @@ final class AppModel: ObservableObject {
         issues = IssueLog.load()
         manualStation = SharedStore.manualStation
         useRealtime = SharedStore.useRealtime
-        plannedWorkOnLockScreen = SharedStore.plannedWorkOnLockScreen
+        mutedKinds = SharedStore.mutedKinds
+        textSizeStep = UserDefaults.standard.object(forKey: "textSizeStep") as? Int ?? AppModel.defaultTextSizeStep
         fontStyle = SharedStore.fontStyle
         widgetStyle = SharedStore.widgetStyle
         favoriteStops = SharedStore.favoriteStops
@@ -130,9 +149,42 @@ final class AppModel: ObservableObject {
         favoritesRequests += 1
     }
 
-    /// Open issues that count towards the Issues badge: everything but elevator notices.
+    /// Open issues that count towards the Issues badge: the ones whose kind is not muted.
     var badgeIssues: [Issue] {
-        issues.active.filter { $0.kind != .elevator }
+        issues.active.filter { !mutedKinds.contains($0.kind) }
+    }
+
+    func setMuted(_ kind: IssueKind, _ muted: Bool) {
+        if muted { mutedKinds.insert(kind) } else { mutedKinds.remove(kind) }
+    }
+
+    // MARK: Guides
+
+    /// Explains what an action will do and waits for a yes. If the user has ticked
+    /// "Don't show this again" for it before, the action just runs.
+    func ask(_ guide: Guide) {
+        if guide.canBeSilenced, Guide.isSilenced(guide.id) {
+            guide.action()
+        } else {
+            self.guide = guide
+        }
+    }
+
+    /// Puts every preference back the way a fresh install has it. The timetable, the
+    /// issue log and what the app has learned about holidays are kept.
+    func restoreDefaults() {
+        SharedStore.restoreDefaults()
+        Guide.showAllAgain()
+        UserDefaults.standard.removeObject(forKey: "textSizeStep")
+        manualStation = SharedStore.manualStation
+        useRealtime = SharedStore.useRealtime
+        mutedKinds = SharedStore.mutedKinds
+        fontStyle = SharedStore.fontStyle
+        widgetStyle = SharedStore.widgetStyle
+        favoriteStops = SharedStore.favoriteStops
+        hiddenTargets = SharedStore.hiddenTargets
+        textSizeStep = AppModel.defaultTextSizeStep
+        visitingStation = nil
     }
 
     /// Moves every train list to `date`.

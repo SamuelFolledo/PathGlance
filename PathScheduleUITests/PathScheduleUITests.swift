@@ -111,13 +111,22 @@ final class PathScheduleUITests: XCTestCase {
         let preview = app.buttons["lockScreenPreview"]
         XCTAssertTrue(preview.waitForExistence(timeout: 30))
         preview.tap()
+        // At half height a drag on the content pulls the sheet up to full height.
+        let standard = app.buttons["font-standard"]
+        XCTAssertTrue(standard.waitForExistence(timeout: 5))
+        let heightBefore = standard.frame.minY
+        standard.swipeUp()
+        XCTAssertLessThan(standard.frame.minY, heightBefore - 100, "Dragging the content up should expand the sheet")
         let serif = app.buttons["font-serif"]
         XCTAssertTrue(serif.waitForExistence(timeout: 5))
         serif.tap()
         XCTAssertTrue(serif.isSelected)
         shot("09-lock-screen-options")
-        app.buttons["font-standard"].tap()
-        app.buttons["Close"].tap()
+        standard.tap()
+        // At full height, a pull down from the top of the content brings the sheet back down, then closes it.
+        standard.swipeDown()
+        standard.swipeDown()
+        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Pulling the content down from its top should close the sheet")
     }
 
     func testStationButtonChangesTheStation() {
@@ -145,6 +154,36 @@ final class PathScheduleUITests: XCTestCase {
         sleep(1)
         shot("11-issues")
         XCTAssertTrue(app.staticTexts["Issues"].waitForExistence(timeout: 5))
+    }
+
+    func testMutingAnIssueKindAsksFirstAndRestoreDefaultsUndoesIt() {
+        launch(tab: "issues")
+        // Planned-work and elevator notices are open most days; take whichever issue is first.
+        let issue = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Since ' OR label CONTAINS ' – '")).firstMatch
+        guard issue.waitForExistence(timeout: 20) else { return } // no issues at all today
+        issue.tap()
+        let mute = app.buttons["muteButton"]
+        XCTAssertTrue(mute.waitForExistence(timeout: 5))
+        if mute.label.hasPrefix("Unmute") { mute.tap() }
+        XCTAssertTrue(mute.label.hasPrefix("Mute"))
+        mute.tap()
+        // Muting is explained before it happens.
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["guideDontShowAgain"].exists)
+        shot("14-mute-guide")
+        app.buttons["guideConfirm"].tap()
+        XCTAssertTrue(mute.label.hasPrefix("Unmute"))
+        app.buttons["Close"].tap()
+        shot("15-muted-issue")
+
+        app.buttons["tab-settings"].tap()
+        let restore = app.buttons["restoreDefaults"]
+        for _ in 0..<6 where !restore.isHittable { app.swipeUp() }
+        restore.tap()
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["guideDontShowAgain"].exists, "A destructive action always asks")
+        shot("16-restore-guide")
+        app.buttons["guideConfirm"].tap()
     }
 
     func testLandscapeKeepsTheList() {

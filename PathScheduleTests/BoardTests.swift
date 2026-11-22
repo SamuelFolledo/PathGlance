@@ -191,7 +191,7 @@ struct BoardPlanTests {
 
     @Test func anAlertNamingALineMarksThatLineOnly() {
         var board = plan(.journalSquare)
-        board.apply(issues: [issue(.delay, lines: ["JSQ-33"])], includePlannedWork: true)
+        board.apply(issues: [issue(.delay, lines: ["JSQ-33"])], muted: [])
         let lines = board.board(at: now).lines
         #expect(lines[0].text.hasPrefix("33rd! "))
         #expect(lines[1].text.hasPrefix("WTC "))
@@ -200,20 +200,20 @@ struct BoardPlanTests {
 
     @Test func alertsWithoutALineShowTheHeaderMark() {
         var general = plan(.journalSquare)
-        general.apply(issues: [issue(.other, lines: [])], includePlannedWork: false)
+        general.apply(issues: [issue(.other, lines: [])], muted: [.plannedWork])
         #expect(general.board(at: now).hasAlert)
 
         var planned = plan(.journalSquare)
-        planned.apply(issues: [issue(.plannedWork, lines: [])], includePlannedWork: false)
+        planned.apply(issues: [issue(.plannedWork, lines: [])], muted: [.plannedWork])
         #expect(!planned.board(at: now).hasAlert)
-        planned.apply(issues: [issue(.plannedWork, lines: [])], includePlannedWork: true)
+        planned.apply(issues: [issue(.plannedWork, lines: [])], muted: [])
         #expect(planned.board(at: now).hasAlert)
     }
 
-    @Test func elevatorAndEndedIssuesNeverShow() {
+    @Test func mutedAndEndedIssuesNeverShow() {
         var board = plan(.journalSquare)
         board.apply(issues: [issue(.elevator, lines: []), issue(.delay, lines: ["JSQ-33"], ended: true), issue(.delay, lines: ["JSQ-33"], detected: true)],
-                    includePlannedWork: true)
+                    muted: SharedStore.defaultMutedKinds)
         let result = board.board(at: now)
         #expect(!result.hasAlert)
         #expect(result.lines.allSatisfy { $0.delay == .none })
@@ -221,8 +221,34 @@ struct BoardPlanTests {
 
     @Test func anAlertForAnotherLineLeavesThisStationAlone() {
         var board = plan(.ninthStreet)
-        board.apply(issues: [issue(.suspension, lines: ["NWK-WTC"])], includePlannedWork: true)
+        board.apply(issues: [issue(.suspension, lines: ["NWK-WTC"])], muted: [])
         #expect(board.board(at: now).lines.allSatisfy { $0.delay == .none })
+    }
+
+    @Test func mutingAKindKeepsItOffTheWidget() {
+        var board = plan(.journalSquare)
+        board.apply(issues: [issue(.suspension, lines: ["JSQ-33"]), issue(.other, lines: [])], muted: [.suspension, .other])
+        let result = board.board(at: now)
+        #expect(!result.hasAlert)
+        #expect(result.lines.allSatisfy { $0.delay == .none })
+    }
+
+    @Test func mutingDelaysAlsoClearsLiveDelayMarks() {
+        let saturday = Fixture.date("2026-11-28 07:15")
+        var live = plan(.journalSquare, at: saturday)
+        live.apply(realtime: [Fixture.arrival(.journalSquare, "33rd Street", at: Fixture.date("2026-11-28 07:35"))], now: saturday)
+        #expect(live.groups[0].delay == .major)
+        live.apply(issues: [], muted: [.delay])
+        #expect(live.board(at: saturday).lines.allSatisfy { $0.delay == .none })
+    }
+
+    @Test func thePreviewMarksWhatAnOptionChanged() {
+        let merged = WidgetPreviewCard.merge(old: "33rd 7:10, 7:20", new: "33rd 7:10→7:33, 7:20")
+        #expect(merged.map(\.text) == ["33rd", "7:10,", "7:10→7:33,", "7:20"])
+        #expect(merged.map(\.change) == [.none, .removed, .added, .none])
+        #expect(WidgetPreviewCard.merge(old: "", new: "WTC 7:03").allSatisfy { $0.change == .added })
+        #expect(WidgetPreviewCard.merge(old: "WTC 7:03", new: "").allSatisfy { $0.change == .removed })
+        #expect(WidgetPreviewCard.merge(old: "WTC 7:03", new: "WTC 7:03").allSatisfy { $0.change == .none })
     }
 }
 

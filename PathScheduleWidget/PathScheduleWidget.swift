@@ -10,7 +10,7 @@ struct BoardEntry: TimelineEntry {
     let fetchedAt: Date
     var message: String?
     var fontStyle: WidgetFontStyle = .standard
-    var density: WidgetDensity = .compact
+    var style = WidgetStyle()
 
     static var sample: BoardEntry {
         let now = Date()
@@ -19,9 +19,9 @@ struct BoardEntry: TimelineEntry {
         }
         return BoardEntry(
             date: now,
-            board: Board(station: .journalSquare, lines: [
-                BoardLine(label: "33rd", times: times([4, 14, 24, 34, 44]), target: .thirtyThirdStreet),
-                BoardLine(label: "WTC", times: times([2, 8, 14, 20, 26]), target: .worldTradeCenter),
+            board: Board(station: .journalSquare, rows: [
+                BoardRow(label: "33rd", target: .thirtyThirdStreet, times: times([4, 14, 24, 34, 44, 54, 64, 74])),
+                BoardRow(label: "WTC", target: .worldTradeCenter, times: times([2, 8, 14, 20, 26, 32, 38, 44])),
             ]),
             fetchedAt: now
         )
@@ -56,7 +56,7 @@ struct BoardProvider: TimelineProvider {
         let fontStyle = SharedStore.fontStyle
         let style = SharedStore.widgetStyle
         guard var schedule = SharedStore.loadSchedule(now: now) else {
-            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle, density: style.density)
+            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle, style: style)
             return ([entry], now.addingTimeInterval(30 * 60))
         }
 
@@ -90,10 +90,10 @@ struct BoardProvider: TimelineProvider {
             issues.noteDetectedDelays(late, at: station, now: now)
         }
         issues.save()
-        plan.apply(issues: issues.active, includePlannedWork: SharedStore.plannedWorkOnLockScreen)
+        plan.apply(issues: issues.active, muted: SharedStore.mutedKinds)
 
         let entries = plan.refreshDates(from: now).map { date in
-            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle, density: style.density)
+            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle, style: style)
         }
         // Reload regularly to pick up a new station and fresh predictions.
         // The app also reloads the widget whenever the station changes.
@@ -122,23 +122,15 @@ struct BoardView: View {
     let entry: BoardEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        Group {
             if let board = entry.board {
-                // The whole header row refreshes: station, live times and alerts are all
-                // read again. Inactive while the phone is locked; works once it is unlocked.
-                Button(intent: RefreshBoardIntent()) {
-                    HStack(spacing: 4) {
-                        Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(entry.fetchedAt))")
-                        Image(systemName: "arrow.clockwise")
-                        if board.hasAlert {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .font(entry.fontStyle.headerFont(entry.density))
-                .accessibilityLabel("Trains from \(board.station.name), updated \(CompactTimes.clockWithPeriod(entry.fetchedAt)). Refresh.")
-                BoardLinesView(board: board, font: entry.fontStyle.bodyFont(entry.density)) { line in
+                BoardWidgetView(board: board, fetchedAt: entry.fetchedAt, fontStyle: entry.fontStyle, style: entry.style) { headerRow in
+                    // The whole header row refreshes: station, live times and alerts are all
+                    // read again. Inactive while the phone is locked; works once it is unlocked.
+                    Button(intent: RefreshBoardIntent()) { headerRow }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Trains from \(board.station.name), updated \(CompactTimes.clockWithPeriod(entry.fetchedAt)). Refresh.")
+                } tapArea: { line in
                     // Each line opens its own list of trains in the app.
                     if let target = line.target {
                         Link(destination: AppLink.line(from: board.station, to: target)) {
@@ -148,13 +140,12 @@ struct BoardView: View {
                 }
             } else {
                 Text(entry.message ?? "No schedule")
+                    .font(entry.fontStyle.bodyFont(entry.style.density))
                     .lineLimit(3)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .font(entry.fontStyle.bodyFont(entry.density))
-        .lineLimit(1)
-        .minimumScaleFactor(0.6)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .containerBackground(.clear, for: .widget)
     }
 }

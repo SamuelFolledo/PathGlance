@@ -161,7 +161,7 @@ struct TrainList: Sendable {
 
             var plan = BoardPlan(station: origin, targets: [target], schedule: schedule, now: now, limit: 600)
             plan.apply(realtime: arrivals, now: now)
-            plan.apply(issues: issues, includePlannedWork: false)
+            plan.apply(issues: issues, muted: [])
             let live = plan.groups.first
             list.delay = live?.delay ?? .none
             list.delayMinutes = live?.delayMinutes ?? 0

@@ -38,12 +38,56 @@ struct BoardLine: Hashable, Sendable {
     }
 }
 
+/// One destination's upcoming trains, before they are cut to what fits on a line.
+struct BoardRow: Hashable, Sendable {
+    var label: String
+    var target: Station
+    var delay: DelayLevel = .none
+    /// More than a line holds, so the widget can show as many as fit.
+    var times: [Date]
+    var arrival: Date?
+    var timeFormat: WidgetTimeFormat = .full
+}
+
 struct Board: Hashable, Sendable {
+    /// The most times a line is ever given.
+    static let mostPerLine = 8
+
     var station: Station
-    /// Zero, one or two lines.
-    var lines: [BoardLine]
+    /// Zero, one or two destinations.
+    var rows: [BoardRow]
+    /// How many times a line shows when nothing measures what fits.
+    var perLine = 5
     /// An open PATH alert that is not tied to one of the lines shown.
     var hasAlert = false
+
+    /// The lines at the usual number of times each.
+    var lines: [BoardLine] { lines(perLine: perLine) }
+
+    /// The lines with `count` times each. Two destinations get a line each. One
+    /// destination runs on across both lines, the second without a label.
+    func lines(perLine count: Int) -> [BoardLine] {
+        if rows.count == 1, let row = rows.first {
+            let first = Array(row.times.prefix(count))
+            let second = Array(row.times.dropFirst(count).prefix(count))
+            var lines = [BoardLine(label: row.label, times: first, delay: row.delay, target: row.target, arrival: row.arrival, timeFormat: row.timeFormat)]
+            if !second.isEmpty {
+                lines.append(BoardLine(label: "", times: second, target: row.target, timeFormat: row.timeFormat))
+            }
+            return lines
+        }
+        return rows.map { row in
+            BoardLine(label: row.label, times: Array(row.times.prefix(count)), delay: row.delay, target: row.target,
+                      arrival: row.arrival, timeFormat: row.timeFormat)
+        }
+    }
+
+    /// The numbers of times per line worth trying, most first. Two destinations stop at
+    /// the user's cap. One destination ignores it: the space is there to be filled.
+    func counts(cap: Int) -> [Int] {
+        let most = rows.count == 1 ? Board.mostPerLine : min(max(cap, 1), Board.mostPerLine)
+        return Array((1...most).reversed())
+    }
 }
 
 enum BoardRules {
@@ -118,8 +162,10 @@ struct WidgetStyle: Hashable, Sendable {
     var density: WidgetDensity = .compact
     var timeFormat: WidgetTimeFormat = .full
     var showArrival = false
+    /// The most times a line may show. The widget shows fewer when fewer fit.
+    var maxTimes = Board.mostPerLine
 
-    /// Train times on each line.
+    /// Train times on each line where nothing measures what fits (VoiceOver, tests).
     var timesPerLine: Int {
         switch (timeFormat, density) {
         case (.short, .compact): return 5
@@ -264,10 +310,17 @@ struct BoardPlan: Sendable {
     }
 
     /// Marks the lines PATH's open alerts name, and notes any alert that names none.
-    mutating func apply(issues: [Issue], includePlannedWork: Bool) {
-        for issue in issues where issue.isActive && !issue.detected && issue.kind != .elevator {
+    /// Issues of a muted kind change nothing here. Muting delays also clears the delay
+    /// marks worked out from live arrivals.
+    mutating func apply(issues: [Issue], muted: Set<IssueKind>) {
+        if muted.contains(.delay) {
+            for index in groups.indices {
+                groups[index].delay = .none
+            }
+        }
+        for issue in issues where issue.isActive && !issue.detected && !muted.contains(issue.kind) {
             if issue.affectedLines.isEmpty {
-                if issue.kind != .plannedWork || includePlannedWork { hasAlert = true }
+                hasAlert = true
                 continue
             }
             for index in groups.indices where issue.affects(from: station, to: groups[index].target) {
@@ -277,7 +330,6 @@ struct BoardPlan: Sendable {
     }
 
     func board(at date: Date) -> Board {
-        let perLine = style.timesPerLine
         let visibleFrom = date.addingTimeInterval(-BoardPlan.grace)
         let upcoming = groups
             .map { group -> Group in
@@ -288,48 +340,38 @@ struct BoardPlan: Sendable {
             .filter { !$0.trains.isEmpty }
 
         guard let first = upcoming.first else {
-            return Board(station: station, lines: [], hasAlert: hasAlert)
+            return Board(station: station, rows: [], perLine: style.timesPerLine, hasAlert: hasAlert)
+        }
+
+        func row(_ group: Group, label: String? = nil, delay: DelayLevel? = nil, count: Int) -> BoardRow {
+            BoardRow(label: label ?? group.target.lineLabel, target: group.target, delay: delay ?? group.delay,
+                     times: group.trains.prefix(count).map(\.time), arrival: arrival(in: group), timeFormat: style.timeFormat)
         }
 
         if upcoming.count >= 2 {
             let second = upcoming[1]
-            let a = Array(first.trains.prefix(perLine))
-            let b = Array(second.trains.prefix(perLine))
+            let a = Array(first.trains.prefix(style.timesPerLine))
+            let b = Array(second.trains.prefix(style.timesPerLine))
             // The same trains serve both destinations (for example Journal Square via Hoboken
-            // late at night), so list them once across both lines.
+            // late at night): list them once across both lines, named for both, as in "JSQ+HOB".
             let sameTrains = a.map(\.time) == b.map(\.time)
                 && a.allSatisfy { $0.serves(second.target) }
                 && b.allSatisfy { $0.serves(first.target) }
             if sameTrains {
-                // One set of trains for two destinations: name both, as in "JSQ+HOB".
-                var both = first
-                both.delay = max(first.delay, second.delay)
-                let label = "\(first.target.lineLabel)+\(second.target.lineLabel)"
-                return Board(station: station, lines: filled(label: label, group: both, perLine: perLine), hasAlert: hasAlert)
+                let both = row(first, label: "\(first.target.lineLabel)+\(second.target.lineLabel)",
+                               delay: max(first.delay, second.delay), count: Board.mostPerLine * 2)
+                return Board(station: station, rows: [both], perLine: style.timesPerLine, hasAlert: hasAlert)
             }
-            return Board(station: station, lines: [
-                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target, arrival: arrival(in: first), timeFormat: style.timeFormat),
-                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target, arrival: arrival(in: second), timeFormat: style.timeFormat),
-            ], hasAlert: hasAlert)
+            return Board(station: station, rows: [row(first, count: Board.mostPerLine), row(second, count: Board.mostPerLine)],
+                         perLine: style.timesPerLine, hasAlert: hasAlert)
         }
 
-        return Board(station: station, lines: filled(label: first.target.lineLabel, group: first, perLine: perLine), hasAlert: hasAlert)
+        return Board(station: station, rows: [row(first, count: Board.mostPerLine * 2)], perLine: style.timesPerLine, hasAlert: hasAlert)
     }
 
     private func arrival(in group: Group) -> Date? {
         guard style.showArrival, let train = group.trains.first else { return nil }
         return schedule.arrival(of: train, from: station, to: group.target)
-    }
-
-    private func filled(label: String, group: Group, perLine: Int) -> [BoardLine] {
-        let times = group.trains.map(\.time)
-        let firstLine = Array(times.prefix(perLine))
-        let secondLine = Array(times.dropFirst(perLine).prefix(perLine))
-        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target, arrival: arrival(in: group), timeFormat: style.timeFormat)]
-        if !secondLine.isEmpty {
-            lines.append(BoardLine(label: "", times: secondLine, target: group.target, timeFormat: style.timeFormat))
-        }
-        return lines
     }
 
     /// Moments at which the board changes: now, then one minute after each departure.

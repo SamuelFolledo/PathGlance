@@ -77,10 +77,26 @@ enum SharedStore {
         set { defaults.set(newValue, forKey: "useRealtime") }
     }
 
-    /// Show the alert mark on the lock screen for planned-work notices too. On by default.
-    static var plannedWorkOnLockScreen: Bool {
-        get { defaults.object(forKey: "plannedWorkOnLockScreen") as? Bool ?? true }
-        set { defaults.set(newValue, forKey: "plannedWorkOnLockScreen") }
+    /// Kinds of issue the user has silenced: still listed in the app, but not counted on
+    /// the Issues badge and not shown on the widget. Elevator notices start out muted.
+    static let defaultMutedKinds: Set<IssueKind> = [.elevator]
+
+    static var mutedKinds: Set<IssueKind> {
+        get {
+            guard let stored = defaults.stringArray(forKey: "mutedIssueKinds") else { return defaultMutedKinds }
+            return Set(stored.compactMap(IssueKind.init(rawValue:)))
+        }
+        set { defaults.set(newValue.map(\.rawValue).sorted(), forKey: "mutedIssueKinds") }
+    }
+
+    /// Every setting kept here, for "Restore defaults".
+    static let preferenceKeys = ["manualStation", "useRealtime", "mutedIssueKinds", "favoriteStops", "hiddenTargets",
+                                 "widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle"]
+
+    static func restoreDefaults() {
+        for key in preferenceKeys {
+            defaults.removeObject(forKey: key)
+        }
     }
 
     /// Stops the user cares about. The Trains tab shows a column of arrival times for each.
@@ -100,13 +116,15 @@ enum SharedStore {
             WidgetStyle(
                 density: defaults.string(forKey: "widgetDensity").flatMap(WidgetDensity.init(rawValue:)) ?? .compact,
                 timeFormat: defaults.string(forKey: "widgetTimeFormat").flatMap(WidgetTimeFormat.init(rawValue:)) ?? .full,
-                showArrival: defaults.bool(forKey: "showArrivalOnWidget")
+                showArrival: defaults.bool(forKey: "showArrivalOnWidget"),
+                maxTimes: defaults.object(forKey: "widgetMaxTimes") as? Int ?? Board.mostPerLine
             )
         }
         set {
             defaults.set(newValue.density.rawValue, forKey: "widgetDensity")
             defaults.set(newValue.timeFormat.rawValue, forKey: "widgetTimeFormat")
             defaults.set(newValue.showArrival, forKey: "showArrivalOnWidget")
+            defaults.set(newValue.maxTimes, forKey: "widgetMaxTimes")
         }
     }
 

@@ -13,9 +13,14 @@ struct ContentView: View {
             page(.issues) { IssuesView() }
             page(.settings) { SettingsView() }
         }
+        // Over whichever tab or sheet asked the question.
+        .appSheet(item: $model.guide, style: .popup, title: \.title) { guide in
+            GuideView(guide: guide) { model.guide = nil }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar()
         }
+        .dynamicTypeSize(model.textSize)
     }
 
     private func page<Content: View>(_ tab: AppTab, @ViewBuilder content: () -> Content) -> some View {
@@ -92,7 +97,9 @@ struct AppTabBar: View {
                         }
                     }
                 Text(item.title)
-                    .font(.caption2.weight(.medium))
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
             .frame(maxWidth: .infinity, minHeight: 46)

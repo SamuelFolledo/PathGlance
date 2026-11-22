@@ -124,7 +124,7 @@ struct TrainListPage: View {
                         .accessibilityLabel(stop.name)
                 }
             }
-            .font(.caption.weight(.semibold))
+            .font(.footnote.weight(.semibold))
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -202,7 +202,7 @@ private struct TrainRows: View, Equatable {
             HStack(spacing: 8) {
                 Rectangle().fill(.tint).frame(height: 1)
                 Text(name)
-                    .font(.caption.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tint)
                     .fixedSize()
                 Rectangle().fill(.tint).frame(height: 1)
@@ -224,14 +224,14 @@ private struct TrainRows: View, Equatable {
                             .foregroundStyle(late ? Color.yellow : Color.primary)
                         if train.isLive {
                             Text(late ? "Live · late" : "Live")
-                                .font(.caption2.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(late ? .yellow : .green)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(Array(cells.enumerated()), id: \.offset) { _, arrival in
                         Text(arrival.map(CompactTimes.clockWithPeriod) ?? "—")
-                            .font(.subheadline)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }

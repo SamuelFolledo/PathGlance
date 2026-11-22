@@ -1,8 +1,13 @@
 import SwiftUI
 
-/// What the lock screen widget shows right now, drawn in the app. Tapping it opens the
-/// widget's options. When an option changes what it shows, the change is pointed out:
-/// text that is added appears green and settles, text that is removed turns red and goes.
+/// The lock screen widget, drawn in the app by the same view the widget uses and at the
+/// widget's real size, then enlarged to fill the row. That makes it accurate: the same
+/// number of times fit here as on the lock screen. (The widget uses fixed type sizes, so
+/// neither the phone's text size setting nor the app's text size slider changes it.)
+///
+/// Tapping it opens the widget's options. When an option changes what it shows, the change
+/// is pointed out: words that are added appear green and settle, words that are removed
+/// turn red and go.
 struct WidgetPreviewCard: View {
     let onTap: () -> Void
 
@@ -10,14 +15,19 @@ struct WidgetPreviewCard: View {
     @EnvironmentObject private var location: LocationService
     @State private var arrivals: [RealtimeArrival] = []
     @State private var now = Date()
-    /// The lines on screen, each a run of pieces that may be marked as just added or removed.
-    @State private var shown: [[Piece]] = []
+    /// The board before the last change, while the change is still being pointed out.
+    @State private var previous: Board?
     @State private var settle: Task<Void, Never>?
 
     struct Piece: Hashable {
         enum Change { case none, added, removed }
         var text: String
         var change: Change = .none
+    }
+
+    /// The rectangular lock screen widget's size in points: a little larger on the widest phones.
+    static var widgetSize: CGSize {
+        UIScreen.main.bounds.width >= 430 ? CGSize(width: 172, height: 76) : CGSize(width: 160, height: 72)
     }
 
     private var station: Station {
@@ -30,49 +40,32 @@ struct WidgetPreviewCard: View {
                              schedule: schedule, now: now)
         plan.style = model.widgetStyle
         plan.apply(realtime: model.useRealtime ? arrivals : [], now: now)
-        plan.apply(issues: model.issues.active, includePlannedWork: model.plannedWorkOnLockScreen)
+        plan.apply(issues: model.issues.active, muted: model.mutedKinds)
         return plan.board(at: now)
     }
 
-    /// The widget's text, line by line: the header, then the train lines.
-    private var lines: [String] {
-        guard let board else { return ["Download the timetable to see the widget"] }
-        let header = "From \(board.station.shortName): \(CompactTimes.clockWithPeriod(now)) ↻" + (board.hasAlert ? " ⚠" : "")
-        return [header] + (board.lines.isEmpty ? ["No upcoming trains"] : board.lines.map(\.text))
-    }
-
     var body: some View {
-        let isCompact = model.widgetStyle.density == .compact
-        let headerFont: Font = model.fontStyle.font(size: isCompact ? 12 : 13)
-        let lineFont: Font = model.fontStyle.font(size: isCompact ? 18 : 21)
-        let lineCount: Int = max(shown.count - 1, 1)
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let header = shown.first {
-                    Text(attributed(header))
-                        .font(headerFont)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                }
-                // The train lines are one block of text, as on the widget, so they share a size.
-                Text(trainLines)
-                .font(lineFont)
-                .lineLimit(lineCount)
-                .minimumScaleFactor(0.4)
-                .multilineTextAlignment(.leading)
+            GeometryReader { proxy in
+                let size = WidgetPreviewCard.widgetSize
+                let scale = min(proxy.size.width / size.width, 2.2)
+                content
+                    .frame(width: size.width, height: size.height, alignment: .leading)
+                    .scaleEffect(scale, anchor: .topLeading)
+                    .frame(width: size.width * scale, height: size.height * scale, alignment: .topLeading)
+                    .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: WidgetPreviewCard.widgetSize.height * min((UIScreen.main.bounds.width - 72) / WidgetPreviewCard.widgetSize.width, 2.2))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Lock screen widget preview. " + lines.joined(separator: ". "))
+        .accessibilityLabel("Lock screen widget preview. " + (board?.lines.map(\.spokenText).joined(separator: ". ") ?? "No timetable yet"))
         .accessibilityHint("Opens the widget options")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("lockScreenPreview")
-        .onAppear { shown = lines.map { WidgetPreviewCard.pieces($0) } }
-        .onChange(of: lines) { old, new in
-            show(change: old, to: new)
+        .onChange(of: board) { old, _ in
+            pointOutChange(from: old)
         }
         .task(id: station) {
             now = Date()
@@ -80,37 +73,36 @@ struct WidgetPreviewCard: View {
         }
     }
 
-    /// Shows the old and new text merged, with what changed marked, then settles on the new.
-    private func show(change old: [String], to new: [String]) {
+    @ViewBuilder
+    private var content: some View {
+        if let board {
+            BoardWidgetView(board: board, fetchedAt: now, fontStyle: model.fontStyle, style: model.widgetStyle,
+                            decorate: previous.map { old in { line, perLine, text in decorated(text, line: line, perLine: perLine, old: old) } },
+                            header: { $0 }, tapArea: { _ in EmptyView() })
+        } else {
+            Text("Download the timetable to see the widget")
+                .font(.system(size: 12))
+        }
+    }
+
+    /// Keeps the old board around for a moment so the difference can be shown.
+    private func pointOutChange(from old: Board?) {
         settle?.cancel()
-        let count = max(old.count, new.count)
-        withAnimation(.snappy(duration: 0.25)) {
-            shown = (0..<count).map { index in
-                WidgetPreviewCard.merge(old: index < old.count ? old[index] : "", new: index < new.count ? new[index] : "")
-            }.filter { !$0.isEmpty }
-        }
+        withAnimation(.snappy(duration: 0.25)) { previous = old }
         settle = Task {
-            try? await Task.sleep(for: .seconds(0.9))
+            try? await Task.sleep(for: .seconds(1.0))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.35)) {
-                shown = new.map { WidgetPreviewCard.pieces($0) }
-            }
+            withAnimation(.easeOut(duration: 0.35)) { previous = nil }
         }
     }
 
-    private var trainLines: AttributedString {
-        var joined = AttributedString()
-        for (index, line) in shown.dropFirst().enumerated() {
-            if index > 0 { joined += AttributedString("\n") }
-            joined += attributed(line)
-        }
-        return joined
-    }
-
-    private func attributed(_ line: [Piece]) -> AttributedString {
+    /// One line's text with the words that differ from the same line of `old` colored.
+    private func decorated(_ text: String, line: Int, perLine: Int, old: Board) -> AttributedString {
+        let before = old.lines(perLine: perLine)
+        let pieces = WidgetPreviewCard.merge(old: line < before.count ? before[line].text : "", new: text)
         var result = AttributedString()
-        for (index, piece) in line.enumerated() {
-            var part = AttributedString(piece.text + (index == line.count - 1 ? "" : " "))
+        for (index, piece) in pieces.enumerated() {
+            var part = AttributedString(piece.text + (index == pieces.count - 1 ? "" : " "))
             switch piece.change {
             case .added: part.foregroundColor = .green
             case .removed:
@@ -124,10 +116,6 @@ struct WidgetPreviewCard: View {
     }
 
     // MARK: Comparing text
-
-    static func pieces(_ line: String) -> [Piece] {
-        line.split(separator: " ").map { Piece(text: String($0)) }
-    }
 
     /// The words of `old` and `new` in one run: words only in `old` marked removed, words
     /// only in `new` marked added, the rest plain.

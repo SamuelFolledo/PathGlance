@@ -55,6 +55,18 @@ struct LockScreenOptionsView: View {
                                  format == .full ? "Every time is written out." : "The hour is dropped when it repeats, which fits one more train on each line.")
                 }
             }
+            FoldSection(title: "Trains per line", value: model.widgetStyle.maxTimes >= Board.mostPerLine ? "As many as fit" : "Up to \(model.widgetStyle.maxTimes)") {
+                Stepper(value: $model.widgetStyle.maxTimes, in: 1...Board.mostPerLine) {
+                    Text(model.widgetStyle.maxTimes >= Board.mostPerLine ? "As many as fit" : "Up to \(model.widgetStyle.maxTimes)")
+                }
+                .padding(.vertical, 6)
+                .overlay(alignment: .bottom) { Divider() }
+                .accessibilityIdentifier("maxTimesStepper")
+                .infoPopover("Trains per line",
+                             "The most train times a line shows.",
+                             "Fewer show when fewer fit: the text is never shrunk to squeeze more in.",
+                             "A station with one line fills both rows with as many as fit, whatever this is set to.")
+            }
             FoldSection(title: "Lines shown", value: linesSummary) {
                 LinesShownRows()
             }
@@ -71,12 +83,9 @@ struct LockScreenOptionsView: View {
                     Text("Adjust with real-time arrivals")
                 }
                 .infoPopover("Real-time arrivals", "The first time or two on each line is replaced with PATH's live prediction.", "Later times stay as scheduled.", "The widget refreshes every 20 minutes with this on, every 60 without.")
-                CheckRow(isOn: model.plannedWorkOnLockScreen) {
-                    model.plannedWorkOnLockScreen.toggle()
-                } label: {
-                    Text("Alert mark for planned work")
-                }
-                .infoPopover("Alert mark", "A warning mark beside the station name means PATH has an open alert.", "Turn this off to ignore planned-work notices, which are open most weekends.", "Elevator notices never show the mark.")
+            }
+            FoldSection(title: "Muted issues", value: model.mutedKinds.isEmpty ? "None" : "\(model.mutedKinds.count)") {
+                MutedKindRows()
             }
         }
     }
@@ -94,7 +103,21 @@ struct LinesShownRows: View {
     var body: some View {
         ForEach(BoardRules.terminals) { station in
             CheckRow(isOn: !model.hiddenTargets.contains(station)) {
-                model.setTarget(station, shown: model.hiddenTargets.contains(station))
+                if model.hiddenTargets.contains(station) {
+                    model.setTarget(station, shown: true)
+                } else {
+                    // Hiding a line changes the widget and the tabs, so it is explained first.
+                    model.ask(Guide(
+                        id: "hide-line",
+                        title: "Hide trains to \(station.name)?",
+                        points: [
+                            "They leave the lock screen widget and the destination tabs.",
+                            "A station left with one line gives it both widget rows, with more times.",
+                            "A station whose only line this is still shows it.",
+                        ],
+                        confirm: "Hide"
+                    ) { model.setTarget(station, shown: false) })
+                }
             } label: {
                 Text("Trains to \(station.name)")
             }
@@ -126,5 +149,25 @@ struct FavoriteStopsView: View {
                      "Each favorite gets a column of arrival times in the train list.",
                      "A stop only shows when trains to the chosen destination call there on the way.",
                      "The destination itself always has a column.")
+    }
+}
+
+/// A check row per kind of issue. A checked kind is muted: still listed in the Issues tab,
+/// but not counted on its badge and not shown on the widget.
+struct MutedKindRows: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        ForEach(IssueKind.allCases, id: \.self) { kind in
+            CheckRow(isOn: model.mutedKinds.contains(kind)) {
+                model.setMuted(kind, !model.mutedKinds.contains(kind))
+            } label: {
+                Label(kind.pluralTitle, systemImage: kind.symbolName)
+            }
+            .infoPopover("Mute \(kind.pluralTitle.lowercased())",
+                         "Checked: these stay in the Issues tab but leave its badge and the lock screen widget.",
+                         kind == .delay ? "Muting delays also hides the ? and ! marks." : "Elevator notices start out muted.")
+            .accessibilityIdentifier("mute-\(kind.rawValue)")
+        }
     }
 }

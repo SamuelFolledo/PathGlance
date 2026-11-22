@@ -48,36 +48,82 @@ enum WidgetFontStyle: String, CaseIterable, Identifiable, Sendable {
     func bodyFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).body, weight: .medium) }
 }
 
-/// The train lines of a board, drawn as one block of text so every line shrinks by the
-/// same amount when it has to: two lines of different lengths never end up in two sizes.
-/// `tapArea` lays a tap target over each line (a `Link` in the widget, a button in the app).
-struct BoardLinesView<TapArea: View>: View {
+/// The whole lock screen widget: the header row, then the train lines. The widget and the
+/// app's preview both draw this, so the preview is the widget.
+///
+/// The lines are one block of text at a fixed size. It shows as many times per line as
+/// fit, trying the most first, so the text is never shrunk and both lines are always the
+/// same size. `tapArea` lays a tap target over each line; `decorate` lets the preview color
+/// the words an option just changed.
+struct BoardWidgetView<Header: View, TapArea: View>: View {
     let board: Board
-    let font: Font
+    let fetchedAt: Date
+    let fontStyle: WidgetFontStyle
+    let style: WidgetStyle
+    var decorate: ((_ line: Int, _ perLine: Int, _ text: String) -> AttributedString)?
+    /// Wraps the header row: a refresh button in the widget, nothing in the preview.
+    @ViewBuilder var header: (AnyView) -> Header
     @ViewBuilder var tapArea: (BoardLine) -> TapArea
 
     var body: some View {
-        if board.lines.isEmpty {
-            Text("No upcoming trains")
-                .font(font)
-        } else {
-            Text(board.lines.map(\.text).joined(separator: "\n"))
-                .font(font)
-                .lineLimit(board.lines.count)
-                .minimumScaleFactor(0.4)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityHidden(true)
-                .overlay {
-                    VStack(spacing: 0) {
-                        ForEach(board.lines, id: \.self) { line in
-                            tapArea(line)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .accessibilityLabel(line.spokenText)
-                        }
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            header(AnyView(headerRow))
+                .font(fontStyle.headerFont(style.density))
+            if board.rows.isEmpty {
+                Text("No upcoming trains")
+            } else {
+                lines
+            }
         }
+        .font(fontStyle.bodyFont(style.density))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var headerRow: some View {
+        HStack(spacing: 4) {
+            Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(fetchedAt))")
+            Image(systemName: "arrow.clockwise")
+            if board.hasAlert {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+    }
+
+    private var lines: some View {
+        let counts = board.counts(cap: style.maxTimes)
+        return ViewThatFits(in: .horizontal) {
+            ForEach(counts, id: \.self) { count in
+                block(count)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            // Even one time does not fit (a long label at the larger size): let it shrink.
+            block(1)
+                .minimumScaleFactor(0.5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+        .overlay {
+            VStack(spacing: 0) {
+                ForEach(board.lines, id: \.self) { line in
+                    tapArea(line)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityLabel(line.spokenText)
+                }
+            }
+        }
+    }
+
+    private func block(_ count: Int) -> some View {
+        var text = AttributedString()
+        for (index, line) in board.lines(perLine: count).enumerated() {
+            if index > 0 { text += AttributedString("\n") }
+            text += decorate?(index, count, line.text) ?? AttributedString(line.text)
+        }
+        return Text(text)
+            .lineLimit(max(board.lines(perLine: count).count, 1))
+            .multilineTextAlignment(.leading)
     }
 }
 

@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var sheet: Sheet?
 
     private enum Sheet: String, Identifiable {
-        case lockScreen, favorites, lines, timetables, dayTypes
+        case lockScreen, favorites, lines, muted, timetables, dayTypes
 
         var id: String { rawValue }
 
@@ -18,6 +18,7 @@ struct SettingsView: View {
             case .lockScreen: return "Lock screen widget"
             case .favorites: return "Favorite stops"
             case .lines: return "Lines shown"
+            case .muted: return "Muted issues"
             case .timetables: return "Timetables"
             case .dayTypes: return "Learned day types"
             }
@@ -46,8 +47,8 @@ struct SettingsView: View {
                         .infoPopover("Real-time arrivals", "The first time or two on each line is replaced with PATH's live prediction.", "Later times stay as scheduled.")
                     Toggle("Arrival time of next train", isOn: $model.widgetStyle.showArrival)
                         .infoPopover("Arrival time", "Adds when the first train on each line reaches its destination.", "Shown as 7:16→7:35.")
-                    Toggle("Alert mark for planned work", isOn: $model.plannedWorkOnLockScreen)
-                        .infoPopover("Alert mark", "A warning mark beside the station name means PATH has an open alert.", "Turn this off to ignore planned-work notices.", "Elevator notices never show the mark.")
+                    row("Muted issues", value: model.mutedKinds.isEmpty ? "None" : model.mutedKinds.map(\.title).sorted().joined(separator: ", "), opens: .muted)
+                        .infoPopover("Muted issues", "Kinds of issue that stay in the Issues tab but leave its badge and the widget.", "Elevator notices start out muted.")
                 } header: {
                     Text("Lock screen")
                 }
@@ -108,11 +109,47 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Text size") {
+                    HStack(spacing: 12) {
+                        Text("A")
+                            .font(.system(size: 13))
+                            .accessibilityHidden(true)
+                        Slider(value: Binding(get: { Double(model.textSizeStep) }, set: { model.textSizeStep = Int($0.rounded()) }),
+                               in: 0...Double(AppModel.textSizes.count - 1), step: 1)
+                            .accessibilityLabel("Text size")
+                            .accessibilityValue("Step \(model.textSizeStep + 1) of \(AppModel.textSizes.count)")
+                            .accessibilityIdentifier("textSizeSlider")
+                        Text("A")
+                            .font(.system(size: 24))
+                            .accessibilityHidden(true)
+                    }
+                    .infoPopover("Text size", "Sets the size of text throughout the app.", "The lock screen widget has its own Size option.")
+                }
+
                 Section("Archive") {
                     row("Timetables", value: "", opens: .timetables)
                         .infoPopover("Timetables", "Every distinct timetable the app has downloaded.")
                     row("Learned day types", value: "", opens: .dayTypes)
                         .infoPopover("Learned day types", "Which timetable live arrivals matched on each day.", "This is how holidays are recognised.")
+                }
+
+                Section {
+                    Button("Restore defaults", role: .destructive) {
+                        // Always asks: it cannot be undone.
+                        model.ask(Guide(
+                            id: "restore-defaults",
+                            title: "Restore defaults?",
+                            points: [
+                                "Every setting goes back to how a fresh install has it: station, widget options, favorite stops, lines shown, muted issues and text size.",
+                                "Explanations you ticked \"Don't show this again\" on will show again.",
+                                "The timetable, the issue history and what the app has learned about holidays are kept.",
+                            ],
+                            confirm: "Restore",
+                            isDestructive: true,
+                            canBeSilenced: false
+                        ) { model.restoreDefaults() })
+                    }
+                    .accessibilityIdentifier("restoreDefaults")
                 }
             }
             .onChange(of: model.resetCount[.settings]) {
@@ -125,6 +162,7 @@ struct SettingsView: View {
             case .lockScreen: LockScreenOptionsView()
             case .favorites: FavoriteStopsView()
             case .lines: VStack(alignment: .leading, spacing: 0) { LinesShownRows() }
+            case .muted: VStack(alignment: .leading, spacing: 0) { MutedKindRows() }
             case .timetables: TimetableArchiveView()
             case .dayTypes: DayTypeLogView()
             }

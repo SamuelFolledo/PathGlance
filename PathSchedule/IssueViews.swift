@@ -50,6 +50,8 @@ struct IssueRow: View {
     let issue: Issue
     /// One of the issues the tab's red badge is counting.
     var countsOnBadge = false
+    /// Its kind is silenced: listed, but not counted and not on the widget.
+    var isMuted = false
     let open: (Issue) -> Void
 
     var body: some View {
@@ -67,17 +69,23 @@ struct IssueRow: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(2)
                     Text(PathFormat.span(issue))
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                     if !issue.latestMessage.isEmpty {
                         Text(issue.latestMessage)
-                            .font(.caption)
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
                 }
                 Spacer(minLength: 0)
-                if countsOnBadge {
+                if isMuted {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 3)
+                        .accessibilityLabel("Muted")
+                } else if countsOnBadge {
                     // The same red as the tab's badge: this is one of the issues it counts.
                     Circle()
                         .fill(.red)
@@ -98,11 +106,46 @@ struct IssueRow: View {
 struct IssueDetailView: View {
     let issue: Issue
 
+    @EnvironmentObject private var model: AppModel
+
+    private var isMuted: Bool { model.mutedKinds.contains(issue.kind) }
+
+    /// Unmuting just happens. Muting is explained first, since it hides things.
+    private func toggleMute() {
+        let kind = issue.kind
+        if isMuted {
+            model.setMuted(kind, false)
+            return
+        }
+        model.ask(Guide(
+            id: "mute-issues",
+            title: "Mute \(kind.pluralTitle.lowercased())?",
+            points: [
+                "Issues of this kind will still be listed in the Issues tab.",
+                "They will no longer count on the Issues badge.",
+                "They will no longer show on the lock screen widget." + (kind == .delay ? " That includes the ? and ! delay marks." : ""),
+                "Unmute here or in Settings, under Muted issues.",
+            ],
+            confirm: "Mute"
+        ) { model.setMuted(kind, true) })
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(issue.kind.title, systemImage: issue.kind.symbolName)
-                .foregroundStyle(issue.kind.color)
-                .font(.subheadline.weight(.semibold))
+            HStack {
+                Label(issue.kind.title, systemImage: issue.kind.symbolName)
+                    .foregroundStyle(issue.kind.color)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(action: toggleMute) {
+                    Label(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "bell.slash.fill" : "bell.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.glass)
+                .accessibilityLabel(isMuted ? "Unmute \(issue.kind.pluralTitle.lowercased())" : "Mute \(issue.kind.pluralTitle.lowercased())")
+                .accessibilityIdentifier("muteButton")
+                .infoPopover("Mute", "Silences every issue of this kind, not just this one.", "Muted issues stay listed but leave the badge and the lock screen widget.")
+            }
             LabeledContent("Started", value: PathFormat.dayTime(issue.startedAt))
             if let ended = issue.endedAt {
                 LabeledContent("Ended", value: PathFormat.dayTime(ended))
@@ -163,7 +206,8 @@ struct IssuesView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(model.issues.active) { issue in
-                        IssueRow(issue: issue, countsOnBadge: issue.kind != .elevator) { selected = $0 }
+                        IssueRow(issue: issue, countsOnBadge: !model.mutedKinds.contains(issue.kind),
+                                 isMuted: model.mutedKinds.contains(issue.kind)) { selected = $0 }
                     }
                 } header: {
                     Text(model.badgeIssues.isEmpty ? "Current" : "Current · red dot = counted on the badge")
@@ -171,7 +215,7 @@ struct IssuesView: View {
                 ForEach(days, id: \.day) { entry in
                     Section {
                         ForEach(entry.issues) { issue in
-                            IssueRow(issue: issue) { selected = $0 }
+                            IssueRow(issue: issue, isMuted: model.mutedKinds.contains(issue.kind)) { selected = $0 }
                         }
                     } header: {
                         Text("Archived · " + (PathTime.date(fromYMD: entry.day).map(PathFormat.dayWithYear) ?? ""))
