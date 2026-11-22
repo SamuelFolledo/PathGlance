@@ -5,3 +5,7 @@ DerivedData/
 build/
 .build/
 *.zip
+
+# Release account details
+scripts/release.local.env
+*.ipa

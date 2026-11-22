@@ -24,11 +24,7 @@ struct WidgetView: View {
     private var pinsPreview: Bool { verticalSizeClass != .compact }
 
     private var titleRow: some View {
-        HStack {
-            Text("Widget")
-                .font(.largeTitle.weight(.bold))
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
+        TabTitle(title: "Widget") {
             RoundButton(symbol: "line.3.horizontal", label: "Settings", identifier: "settingsButton") { sheet = .settings }
                 .infoPopover("Settings", "Station and location, the timetable, text size, the archive and restoring defaults.")
         }
@@ -39,7 +35,6 @@ struct WidgetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     if !pinsPreview {
-                        titleRow
                         preview
                     }
 
@@ -53,19 +48,18 @@ struct WidgetView: View {
                     options
                 }
                 .padding(.horizontal, Theme.Spacing.contentSide)
-                .padding(.top, pinsPreview ? Theme.Spacing.lg : 0)
+                .padding(.top, Theme.Spacing.md)
                 .padding(.bottom, 80)
             }
-            // The preview stays put above the options, so every change is seen as it is made.
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if pinsPreview {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        titleRow
+            // The title and the preview stay put above the options, so every change is seen
+            // as it is made. Nothing is drawn behind them: the options fade out underneath.
+            .pinnedBarTop {
+                VStack(spacing: Theme.Spacing.sm) {
+                    titleRow
+                    if pinsPreview {
                         preview
+                            .padding(.horizontal, Theme.Spacing.contentSide)
                     }
-                    .padding(.horizontal, Theme.Spacing.contentSide)
-                    .padding(.bottom, Theme.Spacing.sm)
-                    .background(Color(.systemGroupedBackground))
                 }
             }
             .background(Color(.systemGroupedBackground))
@@ -281,6 +275,7 @@ struct PresetsView: View {
 struct SettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var location: LocationService
+    @Environment(\.openURL) private var openURL
     @State private var showsStations = false
 
     var body: some View {
@@ -313,6 +308,11 @@ struct SettingsSheet: View {
                     LabeledContent("Location access", value: authorizationText)
                         .padding(.vertical, Theme.Spacing.row)
                         .infoPopover("Location access", "While using: the station updates when the app or widget refreshes.", "Always: it also updates in the background as you reach a station.")
+                    if location.authorization == .denied, let settings = URL(string: UIApplication.openSettingsURLString) {
+                        Button("Turn on location in Settings") { openURL(settings) }
+                            .padding(.vertical, Theme.Spacing.row)
+                            .accessibilityIdentifier("openLocationSettings")
+                    }
                     if location.authorization == .notDetermined || location.authorization == .authorizedWhenInUse {
                         Button(location.authorization == .notDetermined ? "Allow location" : "Allow in background (Always)") {
                             location.requestPermission()
@@ -381,6 +381,57 @@ struct SettingsSheet: View {
                 DayTypeLogView()
             }
 
+            FoldCard(id: "settings-support", title: "Support the app", value: "") {
+                Text("\(AppInfo.name) is free and made in spare time. A tip is welcome, never needed.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, Theme.Spacing.sm)
+                ForEach(AppInfo.donations) { donation in
+                    LinkRow(title: donation.title, symbol: donation.symbol, color: donation.color, opensOutside: true) {
+                        openURL(donation.url)
+                    }
+                    .accessibilityIdentifier("donate-\(donation.id)")
+                }
+            }
+            .infoPopover("Support the app", "Each one opens outside the app.", "Nothing in the app is locked behind a tip.")
+
+            FoldCard(id: "settings-about", title: "About", value: AppInfo.versionText) {
+                LinkRow(title: "Email the developer", symbol: "envelope.fill", color: .blue) {
+                    if let url = AppInfo.email(subject: "\(AppInfo.name) feedback") { openURL(url) }
+                }
+                .accessibilityIdentifier("emailDeveloper")
+                .infoPopover("Email the developer", "Questions, ideas, or a hello.", "Opens your mail app with the app version filled in.")
+                LinkRow(title: "Report a problem", symbol: "ladybug.fill", color: .red) {
+                    if let url = reportURL { openURL(url) }
+                }
+                .accessibilityIdentifier("reportProblem")
+                .infoPopover("Report a problem", "Opens an email with your station, timetable and location access filled in.", "For one wrong train time, press and hold that train on the Trains tab instead.")
+                ShareLink(item: AppInfo.website) {
+                    LinkRowLabel(title: "Share the app", symbol: "square.and.arrow.up.fill", color: .teal, opensOutside: false)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("shareApp")
+                LinkRow(title: "Help", symbol: "questionmark.circle.fill", color: .orange, opensOutside: true) {
+                    openURL(AppInfo.support)
+                }
+                .accessibilityIdentifier("helpPage")
+                LinkRow(title: "Privacy policy", symbol: "hand.raised.fill", color: .gray, opensOutside: true) {
+                    openURL(AppInfo.privacyPolicy)
+                }
+                .accessibilityIdentifier("privacyPolicy")
+                .infoPopover("Privacy", "Your location stays on this phone.", "No account, no ads, no tracking.", "The app only reads timetables, live times and alerts from PATH's website.")
+                LabeledContent("Version", value: AppInfo.versionText)
+                    .padding(.vertical, Theme.Spacing.row)
+                    .accessibilityIdentifier("appVersion")
+                    .infoPopover("Version", "The version, then the build number in brackets.", "Mention it when you report a problem.")
+                LabeledContent("Developer", value: AppInfo.developer)
+                    .padding(.vertical, Theme.Spacing.row)
+                Text(AppInfo.disclaimer)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, Theme.Spacing.sm)
+            }
+
             Button("Restore defaults", role: .destructive) {
                 // Always asks: it cannot be undone.
                 model.ask(Guide(
@@ -402,6 +453,19 @@ struct SettingsSheet: View {
             .accessibilityIdentifier("restoreDefaults")
             .infoPopover("Restore defaults", "Puts every setting back the way a fresh install has it.", "Keeps the timetable, issue history and holiday learning.")
         }
+    }
+
+    /// An email about the app as a whole, with what a fix usually needs filled in.
+    private var reportURL: URL? {
+        AppInfo.email(
+            subject: "\(AppInfo.name): problem report",
+            body: "What happened:\n\n\nWhat you expected:\n",
+            details: [
+                "Station: \(model.station(nearest: location.station).name)\(model.manualStation == nil ? " (nearest)" : "")",
+                "Location access: \(authorizationText)",
+                "Timetable: \(model.schedule?.feedVersion ?? "none")",
+            ]
+        )
     }
 
     private var authorizationText: String {

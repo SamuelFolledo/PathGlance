@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PathSchedule — next PATH trains on your lock screen</title>
+  <meta name="description" content="The next PATH trains from your nearest station, in the app and on your iPhone lock screen. No account, no tracking. An unofficial app." />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <img src="icon.png" alt="" width="28" height="28" />
+        <span>PathSchedule</span>
+      </div>
+      <a href="#testflight" class="btn btn-sm btn-primary">Get the beta</a>
+    </div>
+  </nav>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <img src="icon.png" alt="App icon" class="hero-icon" />
+    <h1>Your next PATH train,<br />before you unlock your phone.</h1>
+    <p class="hero-sub">
+      The next trains from your nearest station, in the app and in a lock screen widget
+      that follows you from Journal Square to 33rd Street.
+    </p>
+    <div class="hero-actions">
+      <!-- build_release.sh replaces this href with the TestFlight public link. Keep the id and one href. -->
+      <a id="testflight" href="#" class="btn btn-primary btn-lg">Join the TestFlight beta</a>
+      <p class="hero-beta" id="testflight-note">The beta opens soon. Check back for the link.</p>
+      <span class="hero-meta">Free &nbsp;·&nbsp; iPhone, iOS 26 or later &nbsp;·&nbsp; Version <span id="app-version">1.0</span></span>
+    </div>
+  </section>
+
+  <!-- ── Screenshots ──────────────────────────────────────────────────────── -->
+  <section class="shots">
+    <h2>A look inside</h2>
+    <div class="shots-row">
+      <figure>
+        <img src="screenshots/trains.png" alt="The Trains tab listing upcoming departures" width="600" height="1304" loading="lazy" />
+        <figcaption>Every train from your station</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/stops.png" alt="A sheet listing each stop of one train with its times" width="600" height="1304" loading="lazy" />
+        <figcaption>Each stop of a train</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/widget.png" alt="The Widget tab with a preview of the lock screen widget" width="600" height="1304" loading="lazy" />
+        <figcaption>The lock screen widget, previewed</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/presets.png" alt="A list of ready-made widget looks" width="600" height="1304" loading="lazy" />
+        <figcaption>Ready-made looks, or your own</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/issues.png" alt="The Issues tab listing service alerts" width="600" height="1304" loading="lazy" />
+        <figcaption>Service issues in one place</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ── Features ─────────────────────────────────────────────────────────── -->
+  <section class="features">
+    <h2>What it does</h2>
+    <div class="features-grid">
+
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Lock screen widget</h3>
+        <p>The next departures toward each terminal, right under the clock. Pick a ready-made look or set the font, size and time format yourself.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">📍</div>
+        <h3>Follows your station</h3>
+        <p>The app and the widget start from the PATH station nearest you. Or pick one station and keep it.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">⭐️</div>
+        <h3>Favorite stops</h3>
+        <p>Add the stops you care about as columns and see when each train reaches them, side by side.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">🚉</div>
+        <h3>Every stop of every train</h3>
+        <p>Tap a train to see each stop and its time. Step to the train before or after without closing the sheet.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">⏱️</div>
+        <h3>Live times and late marks</h3>
+        <p>When PATH reports a live arrival, the app shows it and marks trains that are running late.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">⚠️</div>
+        <h3>Issues you can mute</h3>
+        <p>Service alerts get their own tab. Mute the kinds you don't need, such as elevator notices.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">📶</div>
+        <h3>Works underground</h3>
+        <p>The timetable is saved on your phone, so times still show with no signal in the tunnel.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">🙈</div>
+        <h3>No account, no tracking</h3>
+        <p>Nothing to sign up for. Your location stays on your phone, and there are no ads or analytics.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── How it works ──────────────────────────────────────────────────────── -->
+  <section class="how">
+    <h2>Set up in 3 steps</h2>
+    <ol class="steps">
+      <li>
+        <span class="step-num">1</span>
+        <div>
+          <strong>Open the app</strong>
+          <p>Allow location and it finds your nearest station. Skip that and pick a station yourself.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div>
+          <strong>Add the widget</strong>
+          <p>Press and hold your lock screen, tap Customize, then add the widget under the clock.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div>
+          <strong>Make it yours</strong>
+          <p>Choose a look in the Widget tab and tap Save to widget. Your lock screen updates to match.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ── Requirements ──────────────────────────────────────────────────────── -->
+  <section class="requirements">
+    <h2>Requirements</h2>
+    <ul>
+      <li>iPhone with iOS 26 or later</li>
+      <li>Apple's free TestFlight app, during the beta</li>
+      <li>Location access is optional</li>
+    </ul>
+  </section>
+
+  <!-- ── CTA ───────────────────────────────────────────────────────────────── -->
+  <section class="cta">
+    <h2>Stop opening an app to catch a train.</h2>
+    <a href="#testflight" class="btn btn-primary btn-lg">Get the beta</a>
+    <p class="cta-meta">Free &nbsp;·&nbsp; Questions? See <a href="support.html" style="text-decoration:underline">Support</a></p>
+  </section>
+
+  <!-- ── Footer ────────────────────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="support.html">Support</a>
+    </div>
+    <p>&copy; 2026 Samuel Folledo. Not affiliated with, endorsed by, or sponsored by the Port Authority of New York and New Jersey or PATH.</p>
+  </footer>
+
+</body>
+</html>

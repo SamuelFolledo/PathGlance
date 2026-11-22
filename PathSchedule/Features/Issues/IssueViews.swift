@@ -240,12 +240,6 @@ struct IssuesView: View {
     var body: some View {
         ScrollViewReader { reader in
             List {
-                Text("Issues")
-                    .font(.largeTitle.weight(.bold))
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 0, trailing: 4))
-                    .accessibilityAddTraits(.isHeader)
-                    .id("top")
                 Section {
                     if model.issues.active.isEmpty {
                         Label("No issues reported", systemImage: "checkmark.circle")
@@ -258,6 +252,7 @@ struct IssuesView: View {
                 } header: {
                     Text("Current")
                 }
+                .id("top")
                 ForEach(days, id: \.day) { entry in
                     Section {
                         ForEach(entry.issues) { issue in
@@ -271,6 +266,8 @@ struct IssuesView: View {
             .refreshable {
                 await model.refreshIssues()
             }
+            // The title stays put with nothing behind it; the list fades out underneath.
+            .pinnedBarTop { TabTitle(title: "Issues") }
             .onChange(of: model.resetCount[.issues]) {
                 selected = nil
                 withAnimation { reader.scrollTo("top", anchor: .top) }

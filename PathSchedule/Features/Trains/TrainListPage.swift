@@ -112,22 +112,19 @@ struct TrainListPage: View {
 
     /// An email to the developer, filled in with which train it is about.
     private func reportURL(_ train: TrainTime) -> URL? {
-        var parts = URLComponents()
-        parts.scheme = "mailto"
-        parts.path = "samuelfolledo@gmail.com"
         let when = "\(PathFormat.dayWithYear(train.time)) \(CompactTimes.clockWithPeriod(train.time))"
-        parts.queryItems = [
-            URLQueryItem(name: "subject", value: "PathSchedule: schedule issue, \(origin.name) to \(target.name)"),
-            URLQueryItem(name: "body", value: """
-            Train: \(when) from \(origin.name) to \(target.name)\(train.isLive ? " (live time)" : "")
-            Timetable: \(model.schedule?.feedVersion ?? "unknown")
-
-            What was wrong:
-
-            """),
-        ]
-        return parts.url
+        return AppInfo.email(
+            subject: "\(AppInfo.name): schedule issue, \(origin.name) to \(target.name)",
+            body: "What was wrong:\n",
+            details: [
+                "Train: \(when) from \(origin.name) to \(target.name)\(train.isLive ? " (live time)" : "")",
+                "Timetable: \(model.schedule?.feedVersion ?? "unknown")",
+            ]
+        )
     }
+
+    /// The widest a time gets, for sizing the columns.
+    private var sampleTime: String { TrainColumn<Text>.sampleTime(showsPeriod: model.showsPeriod) }
 
     /// Fixed above the list: the day at the top (tap for the calendar), any holiday
     /// warning, and the column names. Today is in the accent color.
@@ -154,13 +151,15 @@ struct TrainListPage: View {
                     .foregroundStyle(.orange)
             }
             HStack(spacing: 0) {
-                Text(origin.shortName)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                TrainColumn(header: origin.shortName, sample: sampleTime, place: .first) {
+                    Text(origin.shortName)
+                }
                 ForEach(columns) { stop in
-                    // The last column sits against the right edge, like its times below.
-                    Text(stop.shortName)
-                        .frame(maxWidth: .infinity, alignment: stop == columns.last ? .trailing : .leading)
-                        .accessibilityLabel(stop.name)
+                    Spacer(minLength: 4)
+                    TrainColumn(header: stop.shortName, sample: sampleTime, place: stop == columns.last ? .last : .middle) {
+                        Text(stop.shortName)
+                    }
+                    .accessibilityLabel(stop.name)
                 }
             }
             .font(.footnote.weight(.semibold))
@@ -275,19 +274,23 @@ private struct TrainRows: View, Equatable {
             Button {
                 onSelectTrain(train)
             } label: {
+                let stops = Array(list.columns.dropFirst(skipped))
+                let sample = TrainColumn<Text>.sampleTime(showsPeriod: showsPeriod)
                 HStack(alignment: .top, spacing: 0) {
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
-                        if train.isLive {
-                            // Green: a live time, on schedule. Yellow: a live time, running late.
-                            StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
+                    TrainColumn(header: origin.shortName, sample: sample, place: .first) {
+                        HStack(alignment: .firstTextBaseline, spacing: TrainColumnMetrics.dotSpacing) {
+                            TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
+                            if train.isLive {
+                                // Green: a live time, on schedule. Yellow: a live time, running late.
+                                StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(Array(cells.enumerated()), id: \.offset) { index, arrival in
                         // The last column is pushed to the right edge.
                         let isLast = index == cells.count - 1
-                        Group {
+                        Spacer(minLength: 4)
+                        TrainColumn(header: index < stops.count ? stops[index].shortName : "", sample: sample, place: isLast ? .last : .middle) {
                             if let arrival {
                                 TrainTimeText(time: arrival, lateBy: delay, clock: clock, isDeparture: false, isTrailing: isLast)
                             } else {
@@ -296,7 +299,6 @@ private struct TrainRows: View, Equatable {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: isLast ? .trailing : .leading)
                     }
                 }
                 .monospacedDigit()
@@ -414,5 +416,60 @@ struct TrainTimeText: View {
                 .font(isDeparture ? .body.weight(.semibold) : .callout)
                 .foregroundStyle(isDeparture ? .primary : .secondary)
         }
+    }
+}
+
+enum TrainColumnMetrics {
+    static let dotSpacing: CGFloat = 5
+}
+
+/// One column of the train list, in the header and in every row. Each is exactly as wide
+/// as the widest thing it can hold, so the header and the rows line up, and the space left
+/// over is shared equally between the columns however many there are.
+struct TrainColumn<Content: View>: View {
+    enum Place { case first, middle, last }
+
+    /// The column's name in the header.
+    let header: String
+    /// The widest time a row can show.
+    let sample: String
+    let place: Place
+    @ViewBuilder let content: Content
+
+    private var alignment: Alignment {
+        switch place {
+        case .first: return .topLeading
+        case .middle: return .top
+        case .last: return .topTrailing
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: alignment) {
+            // Never seen: these only give the column its width.
+            Group {
+                Text(header)
+                    .font(.footnote.weight(.semibold))
+                HStack(spacing: TrainColumnMetrics.dotSpacing) {
+                    Text(sample)
+                        .font(place == .first ? .body.weight(.semibold) : .callout)
+                        .monospacedDigit()
+                    if place == .first {
+                        Color.clear.frame(width: Theme.Size.dot, height: 1)
+                    }
+                }
+            }
+            .lineLimit(1)
+            .hidden()
+            .accessibilityHidden(true)
+            content
+        }
+    }
+
+    /// "10:00 PM", or "10:00" without the period: no time is wider.
+    static func sampleTime(showsPeriod: Bool) -> String {
+        // 10:00 PM in New York.
+        let late = Date(timeIntervalSinceReferenceDate: 3 * 60 * 60)
+        return showsPeriod ? CompactTimes.clockWithPeriod(late) : CompactTimes.clock(late)
     }
 }

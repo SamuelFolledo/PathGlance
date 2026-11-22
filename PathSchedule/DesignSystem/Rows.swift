@@ -114,6 +114,84 @@ struct OpenRow: View {
     }
 }
 
+extension View {
+    /// Pins `bar` above this scrolling screen with nothing behind it: the content scrolls
+    /// up under the bar and fades out there, so it can still be made out around whatever
+    /// the bar holds. Put it on the scroll view or list. (As usualspots pins Month / Week.)
+    func pinnedBarTop<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
+        scrollEdgeEffectStyle(.soft, for: .top)
+            .safeAreaBar(edge: .top, spacing: 0) { bar() }
+    }
+}
+
+/// A tab's name, small and centered like "From Journal Square" on Trains, with room for
+/// one round button at the right.
+struct TabTitle<Accessory: View>: View {
+    let title: String
+    @ViewBuilder let accessory: Accessory
+
+    var body: some View {
+        Text(title)
+            .font(.title3.weight(.bold))
+            .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: Theme.Size.roundButton)
+            .overlay(alignment: .trailing) { accessory }
+            .padding(.horizontal, Theme.Spacing.contentSide)
+            .padding(.top, Theme.Spacing.sm)
+    }
+}
+
+extension TabTitle where Accessory == EmptyView {
+    init(title: String) {
+        self.init(title: title) { EmptyView() }
+    }
+}
+
+/// A row that leaves the sheet for something else: mail, the share sheet, a web page.
+/// A colored symbol, the title, and an arrow that says whether it leaves the app.
+struct LinkRow: View {
+    let title: String
+    let symbol: String
+    let color: Color
+    var opensOutside = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            LinkRowLabel(title: title, symbol: symbol, color: color, opensOutside: opensOutside)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// What a `LinkRow` looks like, for controls such as `ShareLink` that bring their own button.
+struct LinkRowLabel: View {
+    let title: String
+    let symbol: String
+    let color: Color
+    let opensOutside: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(color)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            Text(title)
+                .foregroundStyle(.primary)
+            Spacer()
+            Image(systemName: opensOutside ? "arrow.up.right" : "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, Theme.Spacing.row)
+        .contentShape(.rect)
+    }
+}
+
 /// A titled group in its own card that folds away. Open by default; folding is remembered
 /// between launches under `id`. The whole title bar folds and unfolds it.
 struct FoldCard<Content: View>: View {

@@ -43,6 +43,21 @@ final class PathScheduleUITests: XCTestCase {
         for _ in 0..<8 where !element.isHittable { app.swipeUp() }
     }
 
+    /// On the Widget tab the options scroll under the pinned preview and the tab bar, and a
+    /// row behind either still counts as hittable. Drag until it is in the clear between them.
+    private func revealBelowPreview(_ element: XCUIElement) {
+        let preview = app.descendants(matching: .any)["lockScreenPreview"].firstMatch
+        let tabBarTop = app.buttons["tab-trains"].frame.minY
+        let middle = (preview.frame.maxY + tabBarTop) / 2
+        for _ in 0..<12 {
+            let frame = element.frame
+            if frame.minY > preview.frame.maxY + 8 && frame.maxY < tabBarTop - 8 { return }
+            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 60, dy: middle))
+            let distance = max(-220, min(220, middle - frame.midY))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)))
+        }
+    }
+
     // MARK: Trains
 
     func testTrainsTabSwitchesDestinationByTapAndSwipe() {
@@ -172,6 +187,8 @@ final class PathScheduleUITests: XCTestCase {
         let large = app.buttons["preset-large"]
         XCTAssertTrue(large.waitForExistence(timeout: 5))
         shot("10-presets")
+        // A custom look left by an earlier run is listed first and pushes Large down.
+        reveal(large)
         large.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5), "Choosing another look should offer Save")
         // Cancel puts the look back and takes both buttons away.
@@ -179,6 +196,7 @@ final class PathScheduleUITests: XCTestCase {
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Cancel should revert to the saved look")
         app.buttons["presetsRow"].tap()
         XCTAssertTrue(large.waitForExistence(timeout: 5))
+        reveal(large)
         large.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
@@ -255,14 +273,39 @@ final class PathScheduleUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Pulling down at half height should close the sheet")
     }
 
+    func testSettingsShowAboutAndSupport() {
+        launch(tab: "widget")
+        let menu = app.buttons["settingsButton"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        XCTAssertTrue(app.buttons["fold-settings-station"].waitForExistence(timeout: 5))
+
+        let coffee = app.buttons["donate-coffee"]
+        reveal(coffee)
+        XCTAssertTrue(app.buttons["donate-cashapp"].exists)
+        shot("17-support")
+
+        let privacy = app.buttons["privacyPolicy"]
+        reveal(privacy)
+        XCTAssertTrue(app.buttons["emailDeveloper"].exists)
+        XCTAssertTrue(app.buttons["reportProblem"].exists)
+        XCTAssertTrue(app.buttons["shareApp"].exists)
+        let version = app.descendants(matching: .any)["appVersion"].firstMatch
+        reveal(version)
+        // "1.0 (1)": the version, then the build in brackets.
+        let text = [version.label, version.value as? String ?? ""].joined(separator: " ")
+        XCTAssertNotNil(text.range(of: #"\d+\.\d+(\.\d+)? \(\d+\)"#, options: .regularExpression), "Got: \(text)")
+        shot("18-about")
+    }
+
     func testHidingALineIsExplainedFirst() {
         launch(tab: "widget")
         let newark = app.buttons["line-newark"]
         XCTAssertTrue(newark.waitForExistence(timeout: 30))
-        reveal(newark)
+        revealBelowPreview(newark)
         if !newark.isSelected {
             newark.tap()
-            reveal(newark)
+            revealBelowPreview(newark)
         }
         newark.tap()
         XCTAssertTrue(app.buttons["guideDontShowAgain"].waitForExistence(timeout: 5), "Hiding a line is explained before it happens")
