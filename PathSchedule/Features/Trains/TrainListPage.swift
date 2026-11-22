@@ -157,8 +157,9 @@ struct TrainListPage: View {
                 Text(origin.shortName)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ForEach(columns) { stop in
+                    // The last column sits against the right edge, like its times below.
                     Text(stop.shortName)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: stop == columns.last ? .trailing : .leading)
                         .accessibilityLabel(stop.name)
                 }
             }
@@ -283,17 +284,19 @@ private struct TrainRows: View, Equatable {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(Array(cells.enumerated()), id: \.offset) { _, arrival in
+                    ForEach(Array(cells.enumerated()), id: \.offset) { index, arrival in
+                        // The last column is pushed to the right edge.
+                        let isLast = index == cells.count - 1
                         Group {
                             if let arrival {
-                                TrainTimeText(time: arrival, lateBy: delay, clock: clock, isDeparture: false)
+                                TrainTimeText(time: arrival, lateBy: delay, clock: clock, isDeparture: false, isTrailing: isLast)
                             } else {
                                 Text("—")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: isLast ? .trailing : .leading)
                     }
                 }
                 .monospacedDigit()
@@ -392,10 +395,12 @@ struct TrainTimeText: View {
     let clock: (Date) -> String
     /// The first column is heavier than the arrival columns.
     let isDeparture: Bool
+    /// In the last column, which is set against the right edge.
+    var isTrailing = false
 
     var body: some View {
         if lateBy > 0 {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: isTrailing ? .trailing : .leading, spacing: 0) {
                 Text(clock(time.addingTimeInterval(-lateBy)))
                     .font(isDeparture ? .subheadline : .footnote)
                     .strikethrough()

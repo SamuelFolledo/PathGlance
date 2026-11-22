@@ -99,6 +99,11 @@ final class AppModel: ObservableObject {
 
     var hasUnsavedLook: Bool { look != savedLook }
 
+    /// Drops the edits not yet saved: the preview goes back to what the widget shows.
+    func revertLook() {
+        look = savedLook
+    }
+
     /// Sends the edited look to the widget. A look that is not a built-in preset also
     /// becomes the custom preset; saving a built-in one leaves the custom preset alone.
     func saveLook() {

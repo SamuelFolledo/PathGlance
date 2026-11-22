@@ -87,6 +87,7 @@ final class PathScheduleUITests: XCTestCase {
         shot("02b-favorites-scrolled")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Newport"].waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'")).firstMatch.waitForExistence(timeout: 10), "The list comes back with the new column")
         shot("03-columns")
     }
 
@@ -173,6 +174,13 @@ final class PathScheduleUITests: XCTestCase {
         shot("10-presets")
         large.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5), "Choosing another look should offer Save")
+        // Cancel puts the look back and takes both buttons away.
+        app.buttons["cancelLook"].tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Cancel should revert to the saved look")
+        app.buttons["presetsRow"].tap()
+        XCTAssertTrue(large.waitForExistence(timeout: 5))
+        large.tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
 

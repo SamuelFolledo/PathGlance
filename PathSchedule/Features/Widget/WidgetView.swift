@@ -6,6 +6,7 @@ import SwiftUI
 struct WidgetView: View {
     @EnvironmentObject private var model: AppModel
     @State private var sheet: Sheet?
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private enum Sheet: String, Identifiable {
         case presets, settings
@@ -19,32 +20,53 @@ struct WidgetView: View {
         return model.customPreset?.look == model.look ? "Custom" : "Custom, not saved"
     }
 
+    /// A phone on its side has too little height to give some of it up for good.
+    private var pinsPreview: Bool { verticalSizeClass != .compact }
+
+    private var titleRow: some View {
+        HStack {
+            Text("Widget")
+                .font(.largeTitle.weight(.bold))
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            RoundButton(symbol: "line.3.horizontal", label: "Settings", identifier: "settingsButton") { sheet = .settings }
+                .infoPopover("Settings", "Station and location, the timetable, text size, the archive and restoring defaults.")
+        }
+    }
+
     var body: some View {
         ScrollViewReader { reader in
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    HStack {
-                        Text("Widget")
-                            .font(.largeTitle.weight(.bold))
-                            .accessibilityAddTraits(.isHeader)
-                        Spacer()
-                        RoundButton(symbol: "line.3.horizontal", label: "Settings", identifier: "settingsButton") { sheet = .settings }
-                            .infoPopover("Settings", "Station and location, the timetable, text size, the archive and restoring defaults.")
+                    if !pinsPreview {
+                        titleRow
+                        preview
                     }
-                    .id("top")
-
-                    preview
 
                     OpenRow(title: "Presets", value: presetName) { sheet = .presets }
                         .padding(Theme.Spacing.contentSide)
                         .card()
                         .accessibilityIdentifier("presetsRow")
+                        .id("top")
                         .infoPopover("Presets", "Ready-made looks to start from.", "Choosing one changes the preview; Save sends it to the widget.", "Changing anything after that makes it your own custom look.")
 
                     options
                 }
                 .padding(.horizontal, Theme.Spacing.contentSide)
+                .padding(.top, pinsPreview ? Theme.Spacing.lg : 0)
                 .padding(.bottom, 80)
+            }
+            // The preview stays put above the options, so every change is seen as it is made.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if pinsPreview {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        titleRow
+                        preview
+                    }
+                    .padding(.horizontal, Theme.Spacing.contentSide)
+                    .padding(.bottom, Theme.Spacing.sm)
+                    .background(Color(.systemGroupedBackground))
+                }
             }
             .background(Color(.systemGroupedBackground))
             .onChange(of: model.resetCount[.widget]) {
@@ -54,18 +76,32 @@ struct WidgetView: View {
         }
         .overlay(alignment: .bottom) {
             if model.hasUnsavedLook {
-                Button {
-                    model.saveLook()
-                } label: {
-                    Label("Save to widget", systemImage: "checkmark")
-                        .font(.headline)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .frame(height: 40)
+                HStack(spacing: Theme.Spacing.sm) {
+                    // Back to what the widget shows now.
+                    Button {
+                        model.revertLook()
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.headline)
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("Cancel changes")
+                    .accessibilityIdentifier("cancelLook")
+                    Button {
+                        model.saveLook()
+                    } label: {
+                        Label("Save to widget", systemImage: "checkmark")
+                            .font(.headline)
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .frame(height: 40)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .accessibilityIdentifier("saveLook")
                 }
-                .buttonStyle(.glassProminent)
                 .padding(.bottom, Theme.Spacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .accessibilityIdentifier("saveLook")
             }
         }
         .animation(Theme.Motion.sheet, value: model.hasUnsavedLook)
