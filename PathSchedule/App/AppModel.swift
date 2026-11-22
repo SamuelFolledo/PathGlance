@@ -4,7 +4,7 @@ import WidgetKit
 import BackgroundTasks
 
 enum AppTab: Hashable {
-    case trains, issues, settings
+    case trains, issues, widget
 }
 
 @MainActor
@@ -56,9 +56,8 @@ final class AppModel: ObservableObject {
         didSet { SharedStore.manualStation = manualStation; reloadWidgets() }
     }
 
-    @Published var useRealtime: Bool {
-        didSet { SharedStore.useRealtime = useRealtime; reloadWidgets() }
-    }
+    /// Live arrivals are always used: the first train or two on each line is PATH's prediction.
+    let useRealtime = true
 
     /// Kinds of issue that are silenced: listed, but not counted and not on the widget.
     @Published var mutedKinds: Set<IssueKind> {
@@ -73,12 +72,72 @@ final class AppModel: ObservableObject {
     /// A question waiting for the user's answer (`ask`).
     @Published var guide: Guide?
 
-    @Published var fontStyle: WidgetFontStyle {
-        didSet { SharedStore.fontStyle = fontStyle; reloadWidgets() }
+    // MARK: Widget look
+
+    /// The look being edited in the Widget tab. The widget itself keeps `savedLook`
+    /// until Save is tapped.
+    @Published var look: WidgetLook
+    /// What the widget is drawing with.
+    @Published private(set) var savedLook: WidgetLook
+    /// The last look saved that was not one of the built-in presets.
+    @Published private(set) var customPreset: CustomPreset?
+
+    struct CustomPreset: Codable, Hashable {
+        var look: WidgetLook
+        var savedAt: Date
     }
 
-    @Published var widgetStyle: WidgetStyle {
-        didSet { SharedStore.widgetStyle = widgetStyle; reloadWidgets() }
+    var fontStyle: WidgetFontStyle {
+        get { look.font }
+        set { look.font = newValue }
+    }
+
+    var widgetStyle: WidgetStyle {
+        get { look.style }
+        set { look.style = newValue }
+    }
+
+    var hasUnsavedLook: Bool { look != savedLook }
+
+    /// Sends the edited look to the widget. A look that is not a built-in preset also
+    /// becomes the custom preset; saving a built-in one leaves the custom preset alone.
+    func saveLook() {
+        savedLook = look
+        SharedStore.widgetLook = look
+        if WidgetPreset.matching(look) == nil {
+            customPreset = CustomPreset(look: look, savedAt: Date())
+            if let data = try? JSONEncoder().encode(customPreset) {
+                UserDefaults.standard.set(data, forKey: "customWidgetPreset")
+            }
+        }
+        reloadWidgets()
+    }
+
+    // MARK: Train list preferences
+
+    /// Favorite stops whose column is hidden for now, without unfavoriting them.
+    @Published var hiddenColumns: Set<Station> {
+        didSet { UserDefaults.standard.set(hiddenColumns.map(\.rawValue), forKey: "hiddenColumns") }
+    }
+
+    /// Show AM and PM after times in the train list.
+    @Published var showsPeriod: Bool {
+        didSet { UserDefaults.standard.set(showsPeriod, forKey: "showsPeriod") }
+    }
+
+    /// The favorite stops that currently get a column.
+    var columnStops: [Station] {
+        favoriteStops.filter { !hiddenColumns.contains($0) }
+    }
+
+    /// Writes a time the way the train list is set to: "7:05 PM" or "7:05".
+    func clock(_ date: Date) -> String {
+        showsPeriod ? CompactTimes.clockWithPeriod(date) : CompactTimes.clock(date)
+    }
+
+    /// Sections the user has folded away, by name. Remembered between launches.
+    @Published var foldedSections: Set<String> {
+        didSet { UserDefaults.standard.set(Array(foldedSections), forKey: "foldedSections") }
     }
 
     /// Stops that get an arrival-time column in the Trains tab.
@@ -95,17 +154,20 @@ final class AppModel: ObservableObject {
         schedule = SharedStore.loadSchedule()
         issues = IssueLog.load()
         manualStation = SharedStore.manualStation
-        useRealtime = SharedStore.useRealtime
         mutedKinds = SharedStore.mutedKinds
         textSizeStep = UserDefaults.standard.object(forKey: "textSizeStep") as? Int ?? AppModel.defaultTextSizeStep
-        fontStyle = SharedStore.fontStyle
-        widgetStyle = SharedStore.widgetStyle
+        look = SharedStore.widgetLook
+        savedLook = SharedStore.widgetLook
+        customPreset = UserDefaults.standard.data(forKey: "customWidgetPreset").flatMap { try? JSONDecoder().decode(CustomPreset.self, from: $0) }
+        hiddenColumns = Set((UserDefaults.standard.stringArray(forKey: "hiddenColumns") ?? []).compactMap(Station.init(rawValue:)))
+        showsPeriod = UserDefaults.standard.object(forKey: "showsPeriod") as? Bool ?? true
+        foldedSections = Set(UserDefaults.standard.stringArray(forKey: "foldedSections") ?? [])
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
         // "-startTab issues" on the command line opens on that tab, for screenshots and UI tests.
         switch UserDefaults.standard.string(forKey: "startTab") {
         case "issues": tab = .issues
-        case "settings": tab = .settings
+        case "settings", "widget": tab = .widget
         default: break
         }
     }
@@ -175,12 +237,18 @@ final class AppModel: ObservableObject {
     func restoreDefaults() {
         SharedStore.restoreDefaults()
         Guide.showAllAgain()
-        UserDefaults.standard.removeObject(forKey: "textSizeStep")
+        for key in ["textSizeStep", "customWidgetPreset", "hiddenColumns", "showsPeriod", "foldedSections"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         manualStation = SharedStore.manualStation
-        useRealtime = SharedStore.useRealtime
         mutedKinds = SharedStore.mutedKinds
-        fontStyle = SharedStore.fontStyle
-        widgetStyle = SharedStore.widgetStyle
+        look = SharedStore.widgetLook
+        savedLook = SharedStore.widgetLook
+        customPreset = nil
+        hiddenColumns = []
+        showsPeriod = true
+        foldedSections = []
+        reloadWidgets()
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
         textSizeStep = AppModel.defaultTextSizeStep
@@ -196,6 +264,7 @@ final class AppModel: ObservableObject {
     func toggleFavorite(_ station: Station) {
         if let index = favoriteStops.firstIndex(of: station) {
             favoriteStops.remove(at: index)
+            hiddenColumns.remove(station)
         } else {
             favoriteStops.append(station)
         }

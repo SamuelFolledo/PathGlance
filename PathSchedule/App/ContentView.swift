@@ -11,7 +11,7 @@ struct ContentView: View {
             // All three stay alive so each keeps its place; only the picked one shows.
             page(.trains) { TrainsView() }
             page(.issues) { IssuesView() }
-            page(.settings) { SettingsView() }
+            page(.widget) { WidgetView() }
         }
         // Over whichever tab or sheet asked the question.
         .appSheet(item: $model.guide, style: .popup, title: \.title) { guide in
@@ -29,13 +29,18 @@ struct ContentView: View {
             .opacity(isShowing ? 1 : 0)
             .allowsHitTesting(isShowing)
             .accessibilityHidden(!isShowing)
+            // The page showing is always on top, so nothing hidden ever lies over it.
+            .zIndex(isShowing ? 1 : 0)
     }
 }
 
-/// The station button, then the tabs. Tapping the tab already showing resets it.
+/// The tabs in a pill centered on the screen, and the station button at its left: the
+/// same height, the same look as a tab at rest, and the look of the picked tab while its
+/// list is open. Tapping the tab already showing resets it.
 struct AppTabBar: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var location: LocationService
+    @State private var showsStations = false
 
     private struct Item {
         let tab: AppTab
@@ -47,33 +52,54 @@ struct AppTabBar: View {
     private let items = [
         Item(tab: .trains, title: "Trains", symbol: "tram.fill", id: "tab-trains"),
         Item(tab: .issues, title: "Issues", symbol: "exclamationmark.triangle.fill", id: "tab-issues"),
-        Item(tab: .settings, title: "Settings", symbol: "gearshape.fill", id: "tab-settings"),
+        Item(tab: .widget, title: "Widget", symbol: "rectangle.on.rectangle", id: "tab-widget"),
     ]
 
     var body: some View {
-        HStack(spacing: 10) {
-            StationMenu(onEditFavorites: model.editFavorites) {
-                StationBadge(station: model.station(nearest: location.station), size: 44)
-                    .padding(6)
-                    .background(.regularMaterial, in: .circle)
-                    .glassEffect(.regular, in: .circle)
-            }
-            .accessibilityLabel("From \(model.station(nearest: location.station).name). Change station")
-            .accessibilityIdentifier("stationButton")
-
+        // The pill keeps to the middle whatever sits beside it.
+        ZStack {
             HStack(spacing: 0) {
                 ForEach(items, id: \.id) { item in
                     button(item)
                 }
             }
-            .padding(4)
+            .padding(Theme.Spacing.xs)
+            .frame(width: 250, height: Theme.Size.tabBar)
             // A solid enough backing that rows scrolling underneath do not show through the labels.
             .background(.regularMaterial, in: .capsule)
             .glassEffect(.regular, in: .capsule)
+
+            HStack {
+                stationButton
+                Spacer()
+            }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Theme.Spacing.contentSide)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
+
+    private var stationButton: some View {
+        let station = model.station(nearest: location.station)
+        return Button {
+            showsStations.toggle()
+        } label: {
+            Text(station.badge)
+                .font(.system(size: station.badge.count > 2 ? 14 : 17, weight: .bold, design: .rounded))
+                .foregroundStyle(showsStations ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                .frame(width: Theme.Size.tabBar, height: Theme.Size.tabBar)
+                .background(showsStations ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.clear), in: .circle)
+                .background(.regularMaterial, in: .circle)
+                .glassEffect(.regular, in: .circle)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showsStations) {
+            StationMenu(isShowing: $showsStations)
+        }
+        .accessibilityLabel("From \(station.name). Change station")
+        .accessibilityAddTraits(showsStations ? .isSelected : [])
+        .accessibilityIdentifier("stationButton")
     }
 
     private func button(_ item: Item) -> some View {
@@ -84,7 +110,7 @@ struct AppTabBar: View {
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: item.symbol)
-                    .font(.system(size: 19))
+                    .font(.system(size: 18))
                     .overlay(alignment: .topTrailing) {
                         if badge > 0 {
                             Text("\(badge)")
@@ -97,16 +123,18 @@ struct AppTabBar: View {
                         }
                     }
                 Text(item.title)
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
             .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-            .frame(maxWidth: .infinity, minHeight: 46)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(isSelected ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.clear), in: .capsule)
             .contentShape(.capsule)
         }
         .buttonStyle(.plain)
+        // The bar keeps its size whatever the app's text size is set to.
+        .dynamicTypeSize(.large)
         .accessibilityLabel(badge > 0 ? "\(item.title), \(badge) open" : item.title)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
         .accessibilityIdentifier(item.id)

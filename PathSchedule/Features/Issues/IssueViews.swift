@@ -25,6 +25,18 @@ enum PathFormat {
         date.formatted(style().weekday(.abbreviated).month(.abbreviated).day())
     }
 
+    /// "Today", "Tomorrow", "Yesterday", or "Sat, Nov 21".
+    static func relativeDay(_ date: Date, now: Date) -> String {
+        let calendar = PathTime.calendar
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        switch days {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        case -1: return "Yesterday"
+        default: return day(date)
+        }
+    }
+
     /// "Sat, Nov 21, 2026"
     static func dayWithYear(_ date: Date) -> String {
         date.formatted(style().weekday(.abbreviated).month(.abbreviated).day().year())
@@ -58,7 +70,7 @@ struct IssueRow: View {
         Button {
             open(issue)
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: Theme.Spacing.md) {
                 Image(systemName: issue.kind.symbolName)
                     .font(.title3)
                     .foregroundStyle(issue.kind.color)
@@ -83,15 +95,10 @@ struct IssueRow: View {
                     Image(systemName: "bell.slash.fill")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .padding(.top, 3)
                         .accessibilityLabel("Muted")
                 } else if countsOnBadge {
                     // The same red as the tab's badge: this is one of the issues it counts.
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 10, height: 10)
-                        .padding(.top, 5)
-                        .accessibilityLabel("Counted on the Issues badge")
+                    StatusDot(color: .red, label: "Counted on the Issues badge", mark: "!")
                 }
             }
             .contentShape(.rect)
@@ -106,15 +113,92 @@ struct IssueRow: View {
 struct IssueDetailView: View {
     let issue: Issue
 
+    /// Newest update first, or the order they were sent.
+    @State private var newestFirst = true
+    @State private var showsSort = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(issue.kind.title, systemImage: issue.kind.symbolName)
+                .foregroundStyle(issue.kind.color)
+                .font(.subheadline.weight(.semibold))
+            LabeledContent("Started", value: PathFormat.dayTime(issue.startedAt))
+            if let ended = issue.endedAt {
+                LabeledContent("Ended", value: PathFormat.dayTime(ended))
+            } else {
+                LabeledContent("Status", value: "Ongoing")
+            }
+            if !issue.affectedLines.isEmpty {
+                LabeledContent("Lines affected", value: issue.affectedLines.joined(separator: ", "))
+            }
+            if issue.detected {
+                Text("Noticed by the app from live arrival times, not announced by PATH.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Divider()
+            HStack {
+                Text("Updates")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button {
+                    showsSort = true
+                } label: {
+                    Label(newestFirst ? "Newest first" : "Oldest first", systemImage: "arrow.up.arrow.down")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.glass)
+                .accessibilityIdentifier("sortUpdates")
+                .popover(isPresented: $showsSort) {
+                    PopoverMenu {
+                        PopoverSectionTitle(title: "Sort updates")
+                        PopoverRadioRow(title: "Newest first", isOn: newestFirst) { newestFirst = true; showsSort = false }
+                        PopoverRadioRow(title: "Oldest first", isOn: !newestFirst) { newestFirst = false; showsSort = false }
+                    }
+                }
+            }
+            ForEach(newestFirst ? issue.updates.reversed() : issue.updates) { update in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(PathFormat.dayTime(update.date))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(update.message.isEmpty ? update.subject : update.message)
+                        .font(.subheadline)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
+/// The bell beside a sheet's X that silences every issue of one kind. Press and hold for
+/// what it does.
+struct MuteButton: View {
+    let kind: IssueKind
+
     @EnvironmentObject private var model: AppModel
 
-    private var isMuted: Bool { model.mutedKinds.contains(issue.kind) }
+    private var isMuted: Bool { model.mutedKinds.contains(kind) }
 
-    /// Unmuting just happens. Muting is explained first, since it hides things.
-    private func toggleMute() {
-        let kind = issue.kind
+    /// Muting is explained first, since it hides things. Unmuting just happens, except
+    /// for elevator notices, which start muted for a reason.
+    private func toggle() {
         if isMuted {
-            model.setMuted(kind, false)
+            guard kind == .elevator else {
+                model.setMuted(kind, false)
+                return
+            }
+            model.ask(Guide(
+                id: "unmute-elevator",
+                title: "Unmute elevator and escalator notices?",
+                points: [
+                    "PATH posts these often, and several are usually open at once.",
+                    "Each will count on the Issues badge and put the alert mark on the lock screen widget.",
+                ],
+                confirm: "Unmute"
+            ) { model.setMuted(kind, false) })
             return
         }
         model.ask(Guide(
@@ -131,51 +215,13 @@ struct IssueDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(issue.kind.title, systemImage: issue.kind.symbolName)
-                    .foregroundStyle(issue.kind.color)
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Button(action: toggleMute) {
-                    Label(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "bell.slash.fill" : "bell.fill")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.glass)
-                .accessibilityLabel(isMuted ? "Unmute \(issue.kind.pluralTitle.lowercased())" : "Mute \(issue.kind.pluralTitle.lowercased())")
-                .accessibilityIdentifier("muteButton")
-                .infoPopover("Mute", "Silences every issue of this kind, not just this one.", "Muted issues stay listed but leave the badge and the lock screen widget.")
-            }
-            LabeledContent("Started", value: PathFormat.dayTime(issue.startedAt))
-            if let ended = issue.endedAt {
-                LabeledContent("Ended", value: PathFormat.dayTime(ended))
-            } else {
-                LabeledContent("Status", value: "Ongoing")
-            }
-            if !issue.affectedLines.isEmpty {
-                LabeledContent("Lines affected", value: issue.affectedLines.joined(separator: ", "))
-            }
-            if issue.detected {
-                Text("Noticed by the app from live arrival times, not announced by PATH.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Divider()
-            Text("Updates")
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-            ForEach(issue.updates.reversed()) { update in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(PathFormat.dayTime(update.date))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(update.message.isEmpty ? update.subject : update.message)
-                        .font(.subheadline)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
-            }
-        }
+        RoundButton(symbol: isMuted ? "bell.slash.fill" : "bell.fill",
+                    label: isMuted ? "Unmute \(kind.pluralTitle.lowercased())" : "Mute \(kind.pluralTitle.lowercased())",
+                    isOn: isMuted, identifier: "muteButton", action: toggle)
+            .infoPopover(isMuted ? "Muted" : "Mute",
+                         "Silences every issue of this kind (\(kind.pluralTitle.lowercased())), not just this one.",
+                         "Muted issues stay listed here but leave the Issues badge and the lock screen widget.",
+                         "Tap again to unmute.")
     }
 }
 
@@ -210,7 +256,7 @@ struct IssuesView: View {
                                  isMuted: model.mutedKinds.contains(issue.kind)) { selected = $0 }
                     }
                 } header: {
-                    Text(model.badgeIssues.isEmpty ? "Current" : "Current · red dot = counted on the badge")
+                    Text("Current")
                 }
                 ForEach(days, id: \.day) { entry in
                     Section {
@@ -230,7 +276,9 @@ struct IssuesView: View {
                 withAnimation { reader.scrollTo("top", anchor: .top) }
             }
         }
-        .appSheet(item: $selected, title: { $0.title }) { issue in
+        .appSheet(item: $selected, title: { $0.title },
+                  subtitle: { _ in "Every update PATH sent about this." },
+                  accessory: { AnyView(MuteButton(kind: $0.kind)) }) { issue in
             IssueDetailView(issue: issue)
         }
     }

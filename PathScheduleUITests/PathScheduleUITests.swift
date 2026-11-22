@@ -29,6 +29,22 @@ final class PathScheduleUITests: XCTestCase {
 
     private var picker: XCUIElement { app.segmentedControls["destinationPicker"] }
 
+    /// Guides explain an action the first time. Accept one if it is showing.
+    private func confirmGuideIfShown() {
+        let confirm = app.buttons["guideConfirm"]
+        if confirm.waitForExistence(timeout: 2) {
+            confirm.tap()
+            _ = confirm.waitForNonExistence(timeout: 3)
+        }
+    }
+
+    /// Scrolls until `element` can be tapped.
+    private func reveal(_ element: XCUIElement) {
+        for _ in 0..<8 where !element.isHittable { app.swipeUp() }
+    }
+
+    // MARK: Trains
+
     func testTrainsTabSwitchesDestinationByTapAndSwipe() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30), "The timetable should download and the destination tabs appear")
@@ -37,13 +53,11 @@ final class PathScheduleUITests: XCTestCase {
         let second = picker.buttons.element(boundBy: 1)
         second.tap()
         XCTAssertTrue(second.isSelected)
-        shot("02-second-destination")
 
         // A sideways swipe on the list turns to the next destination.
         let right = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.7))
         let left = app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.7))
         right.press(forDuration: 0.05, thenDragTo: left, withVelocity: .fast, thenHoldForDuration: 0)
-        shot("03-after-swipe")
         XCTAssertTrue(picker.buttons.element(boundBy: 2).waitForSelected(), "Swiping left should select the third destination")
         left.press(forDuration: 0.05, thenDragTo: right, withVelocity: .fast, thenHoldForDuration: 0)
         XCTAssertTrue(second.waitForSelected())
@@ -52,38 +66,40 @@ final class PathScheduleUITests: XCTestCase {
     func testFavoriteStopAddsAColumn() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
-        // Favorite stops are edited from the station menu.
+        // Favorite stops are edited from the station list.
         app.buttons["originMenu"].firstMatch.tap()
-        app.buttons["Favorite stops"].firstMatch.tap()
+        let favorites = app.buttons["menuFavoriteStops"]
+        XCTAssertTrue(favorites.waitForExistence(timeout: 5))
+        reveal(favorites)
+        favorites.tap()
         let newport = app.buttons["favorite-newport"]
         XCTAssertTrue(newport.waitForExistence(timeout: 5))
         if !newport.isSelected { newport.tap() }
-        let christopher = app.buttons["favorite-christopherStreet"]
-        if !christopher.isSelected { christopher.tap() }
-        shot("04-favorites-sheet")
+        shot("02-favorites-sheet")
         XCTAssertTrue(app.buttons["tab-issues"].exists, "The tab bar stays in view over a sheet")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Newport"].waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
-        shot("05-columns")
+        shot("03-columns")
     }
 
-    func testTrainOpensItsStops() {
+    func testTrainOpensItsStopsAndStepsToTheNext() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
         let trains = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'"))
         XCTAssertTrue(trains.firstMatch.waitForExistence(timeout: 10))
-        // Rows above and below the screen exist too; take one that can be tapped, clear of the pinned header.
-        let onScreen = trains.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY > 380 && $0.frame.maxY < 760 }
+        // Rows above and below the screen exist too; take one that can be tapped.
+        let onScreen = trains.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY > 300 && $0.frame.maxY < 700 }
         XCTAssertFalse(onScreen.isEmpty)
         onScreen[0].tap()
-        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
-        shot("06-stops-sheet")
-        // The arrows step to the next train without closing the sheet.
-        let titleBefore = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' to '")).firstMatch.label
+        let time = app.descendants(matching: .any)["stopsTime"].firstMatch
+        XCTAssertTrue(app.buttons["laterTrain"].waitForExistence(timeout: 5))
+        shot("04-stops-sheet")
+        // The arrow turns to the next train without closing the sheet.
+        let before = time.label
         app.buttons["laterTrain"].tap()
-        let titleAfter = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' to '")).firstMatch.label
-        XCTAssertNotEqual(titleBefore, titleAfter)
+        XCTAssertTrue(time.waitForLabelChange(from: before), "The later-train arrow should show another time")
         XCTAssertTrue(app.buttons["Close"].exists)
+        shot("05-next-train")
         app.buttons["Close"].tap()
     }
 
@@ -93,97 +109,32 @@ final class PathScheduleUITests: XCTestCase {
         let dayBar = app.buttons["dayBar"].firstMatch
         XCTAssertTrue(dayBar.waitForExistence(timeout: 10))
         dayBar.tap()
-        shot("07-date-popup")
         XCTAssertTrue(app.buttons["Back to now"].waitForExistence(timeout: 5))
+        shot("06-date-popup")
         app.buttons["Close"].tap()
 
         // Scroll a long way down; the way back appears.
         for _ in 0..<6 { app.swipeUp(velocity: .fast) }
         let back = app.buttons["backToNow"]
         XCTAssertTrue(back.waitForExistence(timeout: 5), "Scrolling hours ahead should offer a way back to now")
-        shot("08-scrolled-away")
         back.tap()
-        XCTAssertTrue(back.waitForNonExistence(timeout: 5))
-    }
-
-    func testLockScreenOptionsOpenFromPreview() {
-        launch(tab: "settings")
-        let preview = app.buttons["lockScreenPreview"]
-        XCTAssertTrue(preview.waitForExistence(timeout: 30))
-        preview.tap()
-        // At half height a drag on the content pulls the sheet up to full height.
-        let standard = app.buttons["font-standard"]
-        XCTAssertTrue(standard.waitForExistence(timeout: 5))
-        let heightBefore = standard.frame.minY
-        standard.swipeUp()
-        XCTAssertLessThan(standard.frame.minY, heightBefore - 100, "Dragging the content up should expand the sheet")
-        let serif = app.buttons["font-serif"]
-        XCTAssertTrue(serif.waitForExistence(timeout: 5))
-        serif.tap()
-        XCTAssertTrue(serif.isSelected)
-        shot("09-lock-screen-options")
-        standard.tap()
-        // At full height, a pull down from the top of the content brings the sheet back down, then closes it.
-        standard.swipeDown()
-        standard.swipeDown()
-        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Pulling the content down from its top should close the sheet")
+        XCTAssertTrue(back.waitForNonExistence(timeout: 8))
     }
 
     func testStationButtonChangesTheStation() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
         app.buttons["stationButton"].firstMatch.tap()
-        app.buttons["Hoboken"].firstMatch.tap()
+        let hoboken = app.buttons["station-hoboken"]
+        XCTAssertTrue(hoboken.waitForExistence(timeout: 5))
+        shot("07-station-popover")
+        hoboken.tap()
+        confirmGuideIfShown()
         XCTAssertTrue(app.buttons["From Hoboken. Change station"].firstMatch.waitForExistence(timeout: 5))
-        shot("13-hoboken")
         // Put it back so later runs start from the default.
         app.buttons["stationButton"].firstMatch.tap()
-        app.buttons["Journal Square"].firstMatch.tap()
-    }
-
-    func testSettingsAndIssuesTabs() {
-        launch(tab: "settings")
-        let lines = app.buttons["settings-lines"]
-        XCTAssertTrue(lines.waitForExistence(timeout: 10))
-        lines.tap()
-        XCTAssertTrue(app.buttons["line-newark"].waitForExistence(timeout: 5))
-        shot("10-lines-sheet")
-        app.buttons["Close"].tap()
-
-        app.buttons["tab-issues"].tap()
-        sleep(1)
-        shot("11-issues")
-        XCTAssertTrue(app.staticTexts["Issues"].waitForExistence(timeout: 5))
-    }
-
-    func testMutingAnIssueKindAsksFirstAndRestoreDefaultsUndoesIt() {
-        launch(tab: "issues")
-        // Planned-work and elevator notices are open most days; take whichever issue is first.
-        let issue = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Since ' OR label CONTAINS ' – '")).firstMatch
-        guard issue.waitForExistence(timeout: 20) else { return } // no issues at all today
-        issue.tap()
-        let mute = app.buttons["muteButton"]
-        XCTAssertTrue(mute.waitForExistence(timeout: 5))
-        if mute.label.hasPrefix("Unmute") { mute.tap() }
-        XCTAssertTrue(mute.label.hasPrefix("Mute"))
-        mute.tap()
-        // Muting is explained before it happens.
-        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["guideDontShowAgain"].exists)
-        shot("14-mute-guide")
-        app.buttons["guideConfirm"].tap()
-        XCTAssertTrue(mute.label.hasPrefix("Unmute"))
-        app.buttons["Close"].tap()
-        shot("15-muted-issue")
-
-        app.buttons["tab-settings"].tap()
-        let restore = app.buttons["restoreDefaults"]
-        for _ in 0..<6 where !restore.isHittable { app.swipeUp() }
-        restore.tap()
-        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["guideDontShowAgain"].exists, "A destructive action always asks")
-        shot("16-restore-guide")
-        app.buttons["guideConfirm"].tap()
+        app.buttons["station-journalSquare"].tap()
+        confirmGuideIfShown()
     }
 
     func testLandscapeKeepsTheList() {
@@ -191,14 +142,138 @@ final class PathScheduleUITests: XCTestCase {
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        shot("12-landscape")
+        shot("08-landscape")
         XCUIDevice.shared.orientation = .portrait
+    }
+
+    // MARK: Widget
+
+    func testWidgetLookIsEditedThenSaved() {
+        launch(tab: "widget")
+        XCTAssertTrue(app.buttons["presetsRow"].waitForExistence(timeout: 30))
+        shot("09-widget-tab")
+        let save = app.buttons["saveLook"]
+
+        // A preset changes the preview and offers Save; saving hides the button.
+        app.buttons["presetsRow"].tap()
+        let large = app.buttons["preset-large"]
+        XCTAssertTrue(large.waitForExistence(timeout: 5))
+        shot("10-presets")
+        large.tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "Choosing another look should offer Save")
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+
+        // Editing it makes it a custom look, which Save keeps as the custom preset.
+        let serif = app.buttons["font-serif"]
+        reveal(serif)
+        serif.tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        for _ in 0..<4 where !app.buttons["presetsRow"].isHittable { app.swipeDown() }
+        app.buttons["presetsRow"].tap()
+        let custom = app.buttons["preset-custom"]
+        reveal(custom)
+        XCTAssertTrue(custom.waitForExistence(timeout: 5), "A saved custom look should be listed")
+        XCTAssertTrue(custom.isSelected)
+        shot("11-custom-preset")
+
+        // Back to the default for later runs.
+        for _ in 0..<4 where !app.buttons["preset-default"].isHittable { app.swipeDown() }
+        app.buttons["preset-default"].tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+    }
+
+    func testSettingsSheetDragsUpAndDownAndRestoresDefaults() {
+        launch(tab: "widget")
+        let menu = app.buttons["settingsButton"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let station = app.buttons["fold-settings-station"]
+        XCTAssertTrue(station.waitForExistence(timeout: 5))
+        shot("12-settings-sheet")
+
+        // At half height a drag on the content pulls the sheet up to full height.
+        let top = station.frame.minY
+        app.swipeUp()
+        XCTAssertLessThan(station.frame.minY, top - 100, "Dragging the content up should expand the sheet")
+
+        let restore = app.buttons["restoreDefaults"]
+        reveal(restore)
+        restore.tap()
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["guideDontShowAgain"].exists, "A destructive action always asks")
+        shot("13-restore-guide")
+        app.buttons["guideConfirm"].tap()
+
+        // Back at the top of the content, a pull down takes the sheet to half height...
+        let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+        for _ in 0..<8 where !station.isHittable { middle.press(forDuration: 0.05, thenDragTo: lower) }
+        let full = station.frame.minY
+        middle.press(forDuration: 0.05, thenDragTo: lower, withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertGreaterThan(station.frame.minY, full + 100, "Pulling the content down from its top should lower the sheet")
+        // ...and a quick, short pull on the title closes it. It must never go up.
+        app.staticTexts["Settings"].firstMatch.swipeDown(velocity: .fast)
+        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Pulling down at half height should close the sheet")
+    }
+
+    func testHidingALineIsExplainedFirst() {
+        launch(tab: "widget")
+        let newark = app.buttons["line-newark"]
+        XCTAssertTrue(newark.waitForExistence(timeout: 30))
+        reveal(newark)
+        if !newark.isSelected {
+            newark.tap()
+            reveal(newark)
+        }
+        newark.tap()
+        XCTAssertTrue(app.buttons["guideDontShowAgain"].waitForExistence(timeout: 5), "Hiding a line is explained before it happens")
+        shot("14-hide-line-guide")
+        app.buttons["guideCancel"].tap()
+        XCTAssertTrue(newark.isSelected, "Cancel leaves the line showing")
+    }
+
+    // MARK: Issues
+
+    func testMutingAnIssueKindAsksFirst() {
+        launch(tab: "issues")
+        // Planned-work and elevator notices are open most days; take whichever issue is first.
+        let issue = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Since ' OR label CONTAINS ' – '")).firstMatch
+        guard issue.waitForExistence(timeout: 20) else { return } // no issues at all today
+        shot("15-issues")
+        issue.tap()
+        let mute = app.buttons["muteButton"]
+        XCTAssertTrue(mute.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sortUpdates"].exists)
+        if mute.label.hasPrefix("Unmute") {
+            mute.tap()
+            confirmGuideIfShown()
+        }
+        XCTAssertTrue(mute.label.hasPrefix("Mute"), "label is \(mute.label)")
+        mute.tap()
+        // Muting is explained before it happens.
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5), "label is \(mute.label)")
+        shot("16-mute-guide")
+        app.buttons["guideConfirm"].tap()
+        _ = app.buttons["guideConfirm"].waitForNonExistence(timeout: 3)
+        XCTAssertTrue(mute.label.hasPrefix("Unmute"))
+        // Leave it as it was.
+        mute.tap()
+        confirmGuideIfShown()
+        app.buttons["Close"].firstMatch.tap()
     }
 }
 
 private extension XCUIElement {
     func waitForSelected(timeout: TimeInterval = 5) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: self)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    func waitForLabelChange(from old: String, timeout: TimeInterval = 5) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", old), object: self)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 }

@@ -14,6 +14,7 @@ struct TrainsView: View {
     @State private var datePicker: DatePick?
     /// The page the sideways scroll is on.
     @State private var page: Station?
+    @State private var showsStations = false
 
     private enum Sheet: Identifiable {
         case favorites
@@ -66,7 +67,7 @@ struct TrainsView: View {
                 Button {
                     model.jump(to: Date())
                 } label: {
-                    Label("Now", systemImage: "clock.arrow.circlepath")
+                    Label("Now", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 6)
                         .frame(height: 36)
@@ -80,13 +81,13 @@ struct TrainsView: View {
             }
         }
         .animation(.snappy, value: isAway)
-        .appSheet(item: $sheet, title: sheetTitle) { sheet in
+        .appSheet(item: $sheet, title: sheetTitle, subtitle: sheetSubtitle) { sheet in
             switch sheet {
             case .favorites:
                 FavoriteStopsView()
             case .stops(let train, let target, let trains):
                 if let schedule = model.schedule {
-                    StopsView(schedule: schedule, origin: origin, target: target, train: train, trains: trains) { other in
+                    StopsView(schedule: schedule, origin: origin, target: target, train: train, trains: trains, now: now) { other in
                         self.sheet = .stops(other, target: target, trains: trains)
                     }
                 }
@@ -118,10 +119,19 @@ struct TrainsView: View {
         }
     }
 
+    /// "Today · J Sq to 33rd": the day, then where from and to. The time is in the sheet,
+    /// between the arrows, since that is what changes from train to train.
     private func sheetTitle(_ sheet: Sheet) -> String {
         switch sheet {
         case .favorites: return "Favorite stops"
-        case .stops(let train, let target, _): return "\(CompactTimes.clockWithPeriod(train.time)) to \(target.shortName)"
+        case .stops(let train, let target, _): return "\(PathFormat.relativeDay(train.time, now: now)) · \(origin.shortName) to \(target.shortName)"
+        }
+    }
+
+    private func sheetSubtitle(_ sheet: Sheet) -> String? {
+        switch sheet {
+        case .favorites: return "Each checked stop gets a column of arrival times in the train list."
+        case .stops: return nil
         }
     }
 
@@ -137,20 +147,26 @@ struct TrainsView: View {
 
     /// "From Journal Square", centered. Tap for the station list and favorite stops.
     private var title: some View {
-        StationMenu(onEditFavorites: model.editFavorites) {
-            HStack(spacing: 4) {
+        Button {
+            showsStations.toggle()
+        } label: {
+            HStack(spacing: Theme.Spacing.xs) {
                 Text("From \(origin.name)")
                     .font(.title3.weight(.bold))
                 Image(systemName: "chevron.down")
                     .font(.footnote.weight(.bold))
             }
             .foregroundStyle(.primary)
-            .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showsStations) {
+            StationMenu(isShowing: $showsStations)
+        }
+        .frame(maxWidth: .infinity)
         .accessibilityLabel("From \(origin.name). Change station")
         .accessibilityIdentifier("originMenu")
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, Theme.Spacing.contentSide)
+        .padding(.top, Theme.Spacing.sm)
     }
 
     /// Destination tabs fixed at the top of one surface, the lists paging beneath.
@@ -213,8 +229,8 @@ struct TrainsView: View {
             }
         }
         .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(.rect(topLeadingRadius: 24, topTrailingRadius: 24))
-        .padding(.horizontal, 12)
+        .clipShape(.rect(topLeadingRadius: Theme.Radius.card, topTrailingRadius: Theme.Radius.card))
+        .padding(.horizontal, Theme.Spacing.contentSide)
         .ignoresSafeArea(edges: .bottom)
     }
 
@@ -243,8 +259,8 @@ struct TrainsView: View {
     }
 }
 
-/// Every stop one train makes, with its arrival time. The arrows, or a sideways swipe,
-/// step to the train before or after it.
+/// Every stop one train makes, with its arrival time. The arrows, or a sideways swipe that
+/// follows the finger, turn to the train before or after it.
 struct StopsView: View {
     let schedule: ScheduleData
     let origin: Station
@@ -252,11 +268,16 @@ struct StopsView: View {
     let train: TrainTime
     /// The list this train came from, in order.
     let trains: [TrainTime]
+    let now: Date
     let show: (TrainTime) -> Void
 
     @EnvironmentObject private var model: AppModel
+    /// The page the sideways scroll is on: a train's time.
+    @State private var page: Double?
 
     private var index: Int? { trains.firstIndex(of: train) }
+
+    private func id(_ train: TrainTime) -> Double { train.time.timeIntervalSince1970 }
 
     private func step(_ offset: Int) {
         guard let index, trains.indices.contains(index + offset) else { return }
@@ -269,70 +290,131 @@ struct StopsView: View {
     }
 
     var body: some View {
-        let stops = schedule.stops(of: train, from: origin)
-        let route = schedule.routeName(of: train, from: origin)
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            // Between the arrows: the one thing that changes from train to train.
             HStack {
-                stepButton(-1, symbol: "chevron.left", label: "Earlier train")
+                RoundButton(symbol: "chevron.left", label: "Earlier train", identifier: "earlierTrain") { step(-1) }
+                    .disabled(!canStep(-1))
                 Spacer()
                 VStack(spacing: 2) {
-                    Text(PathFormat.day(train.time))
-                        .font(.subheadline.weight(.semibold))
-                    Text((route.isEmpty ? "" : "To \(route)") + (train.isLive ? " · live" : ""))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(CompactTimes.clockWithPeriod(train.time))
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        if train.isLive {
+                            StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
+                        }
+                    }
+                    let route = schedule.routeName(of: train, from: origin)
+                    if !route.isEmpty {
+                        Text("To \(route)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("stopsTime")
                 Spacer()
-                stepButton(1, symbol: "chevron.right", label: "Later train")
+                RoundButton(symbol: "chevron.right", label: "Later train", identifier: "laterTrain") { step(1) }
+                    .disabled(!canStep(1))
             }
-            .padding(.bottom, 8)
-            stopRow(name: origin.name, time: train.time, isFavorite: false, isEnd: false, isOrigin: true)
+            .animation(Theme.Motion.content, value: train)
+
+            // One page per train. The page follows the finger and the next train slides in.
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 0) {
+                    ForEach(trains, id: \.time) { other in
+                        StopsPage(schedule: schedule, origin: origin, target: target, train: other,
+                                  hasLeft: !other.isLive && other.time <= now.addingTimeInterval(-BoardPlan.grace))
+                            .containerRelativeFrame(.horizontal)
+                            .id(id(other))
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            .scrollIndicators(.hidden)
+            .onScrollPhaseChange { _, phase in
+                // Once the swipe has come to rest, the sheet is about that train.
+                if phase == .idle, let page, page != id(train), let landed = trains.first(where: { id($0) == page }) {
+                    show(landed)
+                }
+            }
+            .onChange(of: train) { _, new in
+                if page != id(new) {
+                    withAnimation(Theme.Motion.content) { page = id(new) }
+                }
+            }
+            .onAppear { page = id(train) }
+        }
+    }
+}
+
+/// One train's stops: a banner if it is running late, then every stop.
+private struct StopsPage: View {
+    let schedule: ScheduleData
+    let origin: Station
+    let target: Station
+    let train: TrainTime
+    /// Already gone: shown a little greyed.
+    let hasLeft: Bool
+
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        let stops = schedule.stops(of: train, from: origin)
+        let delay = TimeInterval(train.isLate ? train.delayMinutes * 60 : 0)
+        VStack(alignment: .leading, spacing: 0) {
+            if train.isLate {
+                Label("Running \(TrainTime.delayText(train.delayMinutes)) late. Later stops are moved by the same amount.",
+                      systemImage: IssueKind.delay.symbolName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.yellow)
+                    .padding(Theme.Spacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.yellow.opacity(0.14), in: .rect(cornerRadius: 12))
+                    .padding(.bottom, Theme.Spacing.sm)
+                    .accessibilityIdentifier("delayBanner")
+            } else if hasLeft {
+                Text("This train has left.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, Theme.Spacing.sm)
+            }
+            row(name: origin.name, time: train.time, lateBy: delay, isFavorite: false, isEnd: true)
             ForEach(stops, id: \.station) { stop in
-                stopRow(name: stop.station.name, time: stop.time,
-                        isFavorite: model.favoriteStops.contains(stop.station),
-                        isEnd: stop.station == target, isOrigin: false)
+                row(name: stop.station.name, time: stop.time, lateBy: delay,
+                    isFavorite: model.favoriteStops.contains(stop.station), isEnd: stop.station == target)
+                    .contextMenu {
+                        Button {
+                            model.toggleFavorite(stop.station)
+                        } label: {
+                            Label(model.favoriteStops.contains(stop.station) ? "Unfavorite \(stop.station.name)" : "Favorite \(stop.station.name)",
+                                  systemImage: model.favoriteStops.contains(stop.station) ? "star.slash" : "star")
+                        }
+                        Button {
+                            model.showsPeriod.toggle()
+                        } label: {
+                            Label(model.showsPeriod ? "Hide AM and PM" : "Show AM and PM", systemImage: "clock")
+                        }
+                    }
             }
             if stops.isEmpty {
                 Text("Stop times are not available for this train.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .padding(.top, 8)
+                    .padding(.top, Theme.Spacing.sm)
             }
         }
-        .contentShape(.rect)
-        // Sideways only, so a vertical drag still scrolls or moves the sheet.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 30).onEnded { drag in
-                guard abs(drag.translation.width) > 60, abs(drag.translation.width) > abs(drag.translation.height) * 2 else { return }
-                step(drag.translation.width < 0 ? 1 : -1)
-            }
-        )
+        .opacity(hasLeft ? 0.55 : 1)
     }
 
-    private func stepButton(_ offset: Int, symbol: String, label: String) -> some View {
-        Button {
-            step(offset)
-        } label: {
-            Image(systemName: symbol)
-                .font(.subheadline.weight(.bold))
-                .frame(width: 32, height: 32)
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .disabled(!canStep(offset))
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(offset < 0 ? "earlierTrain" : "laterTrain")
-    }
-
-    private func stopRow(name: String, time: Date, isFavorite: Bool, isEnd: Bool, isOrigin: Bool) -> some View {
+    private func row(name: String, time: Date, lateBy: TimeInterval, isFavorite: Bool, isEnd: Bool) -> some View {
         HStack {
-            Image(systemName: isOrigin ? "circle.fill" : (isEnd ? "mappin.circle.fill" : "circle"))
-                .font(.caption)
-                .foregroundStyle(isOrigin || isEnd ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .frame(width: 20)
-                .accessibilityHidden(true)
             Text(name)
-                .fontWeight(isOrigin || isEnd ? .semibold : .regular)
+                .fontWeight(isEnd ? .semibold : .regular)
             if isFavorite {
                 Image(systemName: "star.fill")
                     .font(.caption)
@@ -340,11 +422,20 @@ struct StopsView: View {
                     .accessibilityLabel("Favorite")
             }
             Spacer()
-            Text(CompactTimes.clockWithPeriod(time))
-                .monospacedDigit()
-                .foregroundStyle(isOrigin || isEnd ? .primary : .secondary)
+            if lateBy > 0 {
+                Text(model.clock(time.addingTimeInterval(-lateBy)))
+                    .strikethrough()
+                    .foregroundStyle(.yellow.opacity(0.7))
+                Text(model.clock(time))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.yellow)
+            } else {
+                Text(model.clock(time))
+                    .foregroundStyle(isEnd ? .primary : .secondary)
+            }
         }
-        .padding(.vertical, 11)
+        .monospacedDigit()
+        .padding(.vertical, Theme.Spacing.row)
         .overlay(alignment: .bottom) { Divider() }
         .accessibilityElement(children: .combine)
     }

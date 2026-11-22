@@ -114,42 +114,80 @@ struct OpenRow: View {
     }
 }
 
-/// A titled group that folds away, showing its current value when closed. The title is
-/// larger than the rows inside it and always in the system font.
-struct FoldSection<Content: View>: View {
+/// A titled group in its own card that folds away. Open by default; folding is remembered
+/// between launches under `id`. The whole title bar folds and unfolds it.
+struct FoldCard<Content: View>: View {
+    let id: String
     let title: String
     var value: String = ""
-    @State var isOpen = false
     @ViewBuilder let content: Content
+
+    @EnvironmentObject private var model: AppModel
+
+    private var isOpen: Bool { !model.foldedSections.contains(id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.snappy(duration: 0.25)) { isOpen.toggle() }
+                withAnimation(Theme.Motion.sheet) {
+                    if isOpen { model.foldedSections.insert(id) } else { model.foldedSections.remove(id) }
+                }
             } label: {
                 HStack {
                     Text(title)
                         .font(.title3.weight(.bold))
                     Spacer()
-                    Text(value)
+                    if !isOpen {
+                        Text(value)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.footnote.weight(.bold))
                         .foregroundStyle(.secondary)
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                        .rotationEffect(.degrees(isOpen ? 0 : -90))
                 }
-                .padding(.vertical, 14)
+                .padding(.vertical, Theme.Spacing.md)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .overlay(alignment: .bottom) { Divider() }
             .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
             .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("fold-\(id)")
             if isOpen {
                 content
-                    .padding(.leading, 4)
             }
         }
+        .padding(.horizontal, Theme.Spacing.contentSide)
+        .padding(.bottom, isOpen ? Theme.Spacing.sm : 0)
+        .card()
+    }
+}
+
+/// A switch whose whole row toggles it.
+struct ToggleRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            HStack {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Toggle(title, isOn: $isOn)
+                    .labelsHidden()
+                    .allowsHitTesting(false)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -167,5 +205,51 @@ struct StationBadge: View {
             .frame(width: size, height: size)
             .background(.tint, in: .circle)
             .accessibilityLabel(station.name)
+    }
+}
+
+/// The app's small round button: the X on a sheet, the arrows that step between trains,
+/// an icon-only action beside a title.
+struct RoundButton: View {
+    let symbol: String
+    let label: String
+    var isOn = false
+    /// For UI tests. Set here, on the button itself, so it names nothing else.
+    var identifier: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                .frame(width: Theme.Size.roundButton, height: Theme.Size.roundButton)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier ?? "")
+    }
+}
+
+/// A small colored dot that says something about a train or an issue at a glance.
+struct StatusDot: View {
+    let color: Color
+    let label: String
+    /// A character drawn inside, such as "!".
+    var mark: String?
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: mark == nil ? Theme.Size.dot : 18, height: mark == nil ? Theme.Size.dot : 18)
+            .overlay {
+                if let mark {
+                    Text(mark)
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+            }
+            .accessibilityLabel(label)
     }
 }

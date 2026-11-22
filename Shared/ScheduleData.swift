@@ -77,6 +77,24 @@ struct TrainTime: Hashable, Sendable {
     var downstream: Int
     /// A live prediction, not a timetable time.
     var isLive = false
+    /// For a live train, the timetable time it is taken to be running in place of.
+    var scheduled: Date?
+
+    /// Whole minutes a live train is behind its timetable time. Zero when on time, early
+    /// or not live.
+    var delayMinutes: Int {
+        guard isLive, let scheduled else { return 0 }
+        return max(0, Int(time.timeIntervalSince(scheduled) / 60))
+    }
+
+    /// Late enough to say so: PATH's own tolerance is a few minutes either way.
+    var isLate: Bool { delayMinutes >= TrainTime.lateAfter }
+    static let lateAfter = 2
+
+    /// "+3m", "+1h2m"
+    static func delayText(_ minutes: Int) -> String {
+        minutes >= 60 ? "+\(minutes / 60)h\(minutes % 60)m" : "+\(minutes)m"
+    }
 
     func serves(_ station: Station) -> Bool {
         downstream & station.bit != 0

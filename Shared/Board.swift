@@ -138,7 +138,7 @@ extension BoardRules {
 }
 
 /// How the widget writes its times.
-enum WidgetTimeFormat: String, CaseIterable, Identifiable, Sendable {
+enum WidgetTimeFormat: String, CaseIterable, Identifiable, Codable, Sendable {
     /// "10:16, 10:35, 10:55"
     case full
     /// "10:16 :35 :55"
@@ -150,7 +150,7 @@ enum WidgetTimeFormat: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// How much the widget fits in.
-enum WidgetDensity: String, CaseIterable, Identifiable, Sendable {
+enum WidgetDensity: String, CaseIterable, Identifiable, Codable, Sendable {
     case compact, regular
 
     var id: String { rawValue }
@@ -158,7 +158,7 @@ enum WidgetDensity: String, CaseIterable, Identifiable, Sendable {
     var detail: String { self == .compact ? "Smaller text, more trains" : "Larger text, fewer trains" }
 }
 
-struct WidgetStyle: Hashable, Sendable {
+struct WidgetStyle: Hashable, Codable, Sendable {
     var density: WidgetDensity = .compact
     var timeFormat: WidgetTimeFormat = .full
     var showArrival = false
@@ -286,7 +286,12 @@ struct BoardPlan: Sendable {
                     if let nearest, abs(nearest.time.timeIntervalSince(arrival.arrival)) <= 15 * 60 {
                         downstream |= nearest.downstream
                     }
-                    return TrainTime(time: arrival.arrival, downstream: downstream, isLive: true)
+                    // The latest timetable time it could be: trains rarely run more than three
+                    // minutes early, and half an hour or more is a gap, not a late train.
+                    let scheduled = groups[index].timetable
+                        .last { $0 <= arrival.arrival.addingTimeInterval(3 * 60) }
+                        .flatMap { arrival.arrival.timeIntervalSince($0) < 30 * 60 ? $0 : nil }
+                    return TrainTime(time: arrival.arrival, downstream: downstream, isLive: true, scheduled: scheduled)
                 }
                 .sorted { $0.time < $1.time }
             guard let firstLive = live.first, let lastLive = live.last else { continue }

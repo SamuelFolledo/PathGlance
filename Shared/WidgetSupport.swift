@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Lock screen text styles the user can pick in the app. The header is always smaller
 /// than the train times.
-enum WidgetFontStyle: String, CaseIterable, Identifiable, Sendable {
+enum WidgetFontStyle: String, CaseIterable, Identifiable, Codable, Sendable {
     case standard, rounded, monospaced, condensed, serif
 
     var id: String { rawValue }
@@ -124,6 +124,8 @@ struct BoardWidgetView<Header: View, TapArea: View>: View {
         return Text(text)
             .lineLimit(max(board.lines(perLine: count).count, 1))
             .multilineTextAlignment(.leading)
+            // Where the view is animated (the app's preview), a change of text fades through.
+            .contentTransition(.opacity)
     }
 }
 
@@ -133,6 +135,37 @@ extension BoardLine {
         let name = target?.name ?? label
         let status = delay == .none ? "" : (delay == .major ? ", long delay" : ", short delay")
         return "To \(name)\(status): " + times.map(CompactTimes.clockWithPeriod).joined(separator: ", ")
+    }
+}
+
+/// Everything about how the widget looks: what a preset holds, and what "Save" writes.
+struct WidgetLook: Hashable, Codable, Sendable {
+    var font: WidgetFontStyle = .standard
+    var style = WidgetStyle()
+}
+
+/// A named look the user can start from.
+struct WidgetPreset: Identifiable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let detail: String
+    let look: WidgetLook
+
+    static let builtIn: [WidgetPreset] = [
+        WidgetPreset(id: "default", name: "Default", detail: "Full times, compact",
+                     look: WidgetLook()),
+        WidgetPreset(id: "packed", name: "Packed", detail: "Shortened times, as many trains as fit",
+                     look: WidgetLook(font: .condensed, style: WidgetStyle(density: .compact, timeFormat: .short))),
+        WidgetPreset(id: "large", name: "Large", detail: "Bigger text, fewer trains",
+                     look: WidgetLook(font: .rounded, style: WidgetStyle(density: .regular, timeFormat: .short, maxTimes: 3))),
+        WidgetPreset(id: "arrivals", name: "Next train", detail: "The next train and when it arrives",
+                     look: WidgetLook(font: .standard, style: WidgetStyle(density: .regular, timeFormat: .full, showArrival: true, maxTimes: 2))),
+        WidgetPreset(id: "board", name: "Departure board", detail: "Monospaced, columns line up",
+                     look: WidgetLook(font: .monospaced, style: WidgetStyle(density: .compact, timeFormat: .short))),
+    ]
+
+    static func matching(_ look: WidgetLook) -> WidgetPreset? {
+        builtIn.first { $0.look == look }
     }
 }
 

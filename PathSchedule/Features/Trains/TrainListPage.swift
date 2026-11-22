@@ -13,6 +13,8 @@ struct TrainListPage: View {
     let onPickDate: () -> Void
     let onRefresh: () async -> Void
 
+    @Environment(\.openURL) private var openURL
+
     @EnvironmentObject private var model: AppModel
     @State private var list: TrainList?
     @State private var topID: Double?
@@ -33,7 +35,7 @@ struct TrainListPage: View {
     }
 
     private var buildKey: BuildKey {
-        BuildKey(origin: origin, target: target, favorites: model.favoriteStops,
+        BuildKey(origin: origin, target: target, favorites: model.columnStops,
                  imported: model.schedule?.importedAt,
                  minute: Int(now.timeIntervalSince1970 / 60),
                  arrivalCount: arrivals.count,
@@ -55,8 +57,10 @@ struct TrainListPage: View {
                     }
                     // Equatable: scrolling changes `topID` many times a second, and the
                     // rows must not be laid out again for that.
-                    TrainRows(list: list, origin: origin, target: target, skipped: skipped, moves: moves, topID: $topID,
+                    TrainRows(list: list, origin: origin, target: target, skipped: skipped, moves: moves,
+                              showsPeriod: model.showsPeriod, hasHiddenColumns: !model.hiddenColumns.isEmpty, topID: $topID,
                               onSelectTrain: { onSelectTrain($0, list.trains) },
+                              onMenu: handle,
                               onSettle: { if isSelected { model.listAnchor = TrainList.time(of: $0) } },
                               onRefresh: onRefresh)
                         .equatable()
@@ -69,7 +73,7 @@ struct TrainListPage: View {
         .task(id: buildKey) {
             guard let schedule = model.schedule else { return }
             let isFirst = list == nil
-            let built = await model.trainLists.list(schedule: schedule, origin: origin, target: target, favorites: model.favoriteStops,
+            let built = await model.trainLists.list(schedule: schedule, origin: origin, target: target, favorites: model.columnStops,
                                                     arrivals: arrivals, issues: model.issues.active, dayTypes: dayTypes, now: now)
             guard !Task.isCancelled else { return }
             list = built
@@ -79,16 +83,50 @@ struct TrainListPage: View {
             if !isSelected { move(to: anchor, in: list) }
         }
         .onChange(of: model.jumpCount) {
-            move(to: model.listAnchor, in: list)
+            move(to: model.listAnchor, in: list, animated: isSelected)
         }
     }
 
-    /// Puts the first train at or after `time` at the top. Not animated: a jump can cross
-    /// days of rows that are not laid out yet, and an animated scroll through them stalls.
-    private func move(to time: Date, in list: TrainList?) {
+    /// Puts the first train at or after `time` at the top. The list on screen scrolls
+    /// there; the others just take the position.
+    private func move(to time: Date, in list: TrainList?, animated: Bool = false) {
         guard let id = list?.rowID(for: time) else { return }
-        topID = id
-        moves += 1
+        withAnimation(animated ? .smooth(duration: 0.45) : nil) {
+            topID = id
+            moves += 1
+        }
+    }
+
+    /// What a row's long-press menu asked for.
+    private func handle(_ action: TrainRowAction) {
+        switch action {
+        case .hideColumn(let stop): model.hiddenColumns.insert(stop)
+        case .unfavorite(let stop): model.toggleFavorite(stop)
+        case .showHiddenColumns: model.hiddenColumns = []
+        case .togglePeriod: model.showsPeriod.toggle()
+        case .editFavorites: model.editFavorites()
+        case .report(let train):
+            if let url = reportURL(train) { openURL(url) }
+        }
+    }
+
+    /// An email to the developer, filled in with which train it is about.
+    private func reportURL(_ train: TrainTime) -> URL? {
+        var parts = URLComponents()
+        parts.scheme = "mailto"
+        parts.path = "samuelfolledo@gmail.com"
+        let when = "\(PathFormat.dayWithYear(train.time)) \(CompactTimes.clockWithPeriod(train.time))"
+        parts.queryItems = [
+            URLQueryItem(name: "subject", value: "PathSchedule: schedule issue, \(origin.name) to \(target.name)"),
+            URLQueryItem(name: "body", value: """
+            Train: \(when) from \(origin.name) to \(target.name)\(train.isLive ? " (live time)" : "")
+            Timetable: \(model.schedule?.feedVersion ?? "unknown")
+
+            What was wrong:
+
+            """),
+        ]
+        return parts.url
     }
 
     /// Fixed above the list: the day at the top (tap for the calendar), any holiday
@@ -135,6 +173,16 @@ struct TrainListPage: View {
     }
 }
 
+/// What a train row's long-press menu can ask for.
+enum TrainRowAction {
+    case hideColumn(Station)
+    case unfavorite(Station)
+    case showHiddenColumns
+    case togglePeriod
+    case editFavorites
+    case report(TrainTime)
+}
+
 /// The scrolling rows of a train list. Redrawn only when the list itself changes.
 private struct TrainRows: View, Equatable {
     let list: TrainList
@@ -144,14 +192,23 @@ private struct TrainRows: View, Equatable {
     let skipped: Int
     /// Changes when the list was moved in code, which must reach the scroll view.
     let moves: Int
+    /// AM and PM after each time.
+    let showsPeriod: Bool
+    let hasHiddenColumns: Bool
     @Binding var topID: Double?
     let onSelectTrain: (TrainTime) -> Void
+    let onMenu: (TrainRowAction) -> Void
     let onSettle: (Double) -> Void
     let onRefresh: () async -> Void
 
     static func == (lhs: TrainRows, rhs: TrainRows) -> Bool {
         lhs.list.version == rhs.list.version && lhs.skipped == rhs.skipped && lhs.moves == rhs.moves
+            && lhs.showsPeriod == rhs.showsPeriod && lhs.hasHiddenColumns == rhs.hasHiddenColumns
             && lhs.origin == rhs.origin && lhs.target == rhs.target
+    }
+
+    private func clock(_ date: Date) -> String {
+        showsPeriod ? CompactTimes.clockWithPeriod(date) : CompactTimes.clock(date)
     }
 
     var body: some View {
@@ -164,7 +221,7 @@ private struct TrainRows: View, Equatable {
                         Text("No trains to \(target.name) on this day.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .padding(16)
+                            .padding(Theme.Spacing.contentSide)
                     }
                     ForEach(day.rows) { row in
                         rowView(row)
@@ -188,8 +245,8 @@ private struct TrainRows: View, Equatable {
             .font(.subheadline.weight(.bold))
             .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
+            .padding(.horizontal, Theme.Spacing.contentSide)
+            .padding(.top, Theme.Spacing.lg)
             .padding(.bottom, 6)
             .background(Color(.tertiarySystemGroupedBackground))
             .accessibilityAddTraits(.isHeader)
@@ -199,7 +256,7 @@ private struct TrainRows: View, Equatable {
     private func rowView(_ row: TrainList.Row) -> some View {
         switch row.kind {
         case .routeChange(let name):
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Spacing.sm) {
                 Rectangle().fill(.tint).frame(height: 1)
                 Text(name)
                     .font(.footnote.weight(.semibold))
@@ -207,61 +264,150 @@ private struct TrainRows: View, Equatable {
                     .fixedSize()
                 Rectangle().fill(.tint).frame(height: 1)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.Spacing.contentSide)
             .padding(.vertical, 6)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("From here, trains run \(name)")
         case .train(let train, let allCells):
             let cells = Array(allCells.dropFirst(skipped))
-            let late = train.isLive && list.delay != .none
+            let delay = TimeInterval(train.isLate ? train.delayMinutes * 60 : 0)
             Button {
                 onSelectTrain(train)
             } label: {
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(CompactTimes.clockWithPeriod(train.time))
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(late ? Color.yellow : Color.primary)
+                HStack(alignment: .top, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
                         if train.isLive {
-                            Text(late ? "Live · late" : "Live")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(late ? .yellow : .green)
+                            // Green: a live time, on schedule. Yellow: a live time, running late.
+                            StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(Array(cells.enumerated()), id: \.offset) { _, arrival in
-                        Text(arrival.map(CompactTimes.clockWithPeriod) ?? "—")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Group {
+                            if let arrival {
+                                TrainTimeText(time: arrival, lateBy: delay, clock: clock, isDeparture: false)
+                            } else {
+                                Text("—")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.Spacing.contentSide)
                 .padding(.vertical, 10)
                 .contentShape(.rect)
-                .opacity(row.isPast ? 0.4 : 1)
+                // A train that has gone is still there to look at, a little greyed.
+                .opacity(row.isPast ? 0.45 : 1)
             }
             .buttonStyle(.plain)
-            // A train that has gone is shown for reference only.
-            .disabled(row.isPast)
             .overlay(alignment: .bottom) {
-                Divider().padding(.leading, 16)
+                Divider().padding(.leading, Theme.Spacing.contentSide)
             }
+            .contextMenu { menu(train) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(spoken(train, cells: allCells, isPast: row.isPast))
-            .accessibilityHint(row.isPast ? "" : "Shows every stop")
+            .accessibilityHint("Shows every stop")
             .accessibilityAddTraits(.isButton)
         }
     }
 
+    /// The long-press menu: what can be done about this train and about the columns.
+    @ViewBuilder
+    private func menu(_ train: TrainTime) -> some View {
+        Button {
+            onSelectTrain(train)
+        } label: {
+            Label("Show every stop", systemImage: "list.bullet")
+        }
+        let stops = list.columns.filter { $0 != target }
+        if !stops.isEmpty {
+            Section("Columns") {
+                ForEach(stops) { stop in
+                    Button {
+                        onMenu(.hideColumn(stop))
+                    } label: {
+                        Label("Hide \(stop.name)", systemImage: "eye.slash")
+                    }
+                }
+                ForEach(stops) { stop in
+                    Button(role: .destructive) {
+                        onMenu(.unfavorite(stop))
+                    } label: {
+                        Label("Unfavorite \(stop.name)", systemImage: "star.slash")
+                    }
+                }
+            }
+        }
+        Section {
+            if hasHiddenColumns {
+                Button {
+                    onMenu(.showHiddenColumns)
+                } label: {
+                    Label("Show hidden columns", systemImage: "eye")
+                }
+            }
+            Button {
+                onMenu(.togglePeriod)
+            } label: {
+                Label(showsPeriod ? "Hide AM and PM" : "Show AM and PM", systemImage: "clock")
+            }
+            Button {
+                onMenu(.editFavorites)
+            } label: {
+                Label("Favorite stops", systemImage: "star")
+            }
+        }
+        Section {
+            Button {
+                onMenu(.report(train))
+            } label: {
+                Label("Report a schedule issue", systemImage: "envelope")
+            }
+        }
+    }
+
     private func spoken(_ train: TrainTime, cells: [Date?], isPast: Bool) -> String {
-        var parts = [(isPast ? "Departed " : "Departs ") + CompactTimes.clockWithPeriod(train.time) + (train.isLive ? ", live" : "")]
+        var parts = [(isPast ? "Departed " : "Departs ") + CompactTimes.clockWithPeriod(train.time)
+                     + (train.isLive ? (train.isLate ? ", live, \(train.delayMinutes) minutes late" : ", live") : "")]
         for (stop, arrival) in zip(list.columns, cells) {
             if let arrival { parts.append("\(stop.name) \(CompactTimes.clockWithPeriod(arrival))") }
         }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// One time in a train row. When the train is late, the timetable time is struck through
+/// and the live time sits under it in yellow.
+struct TrainTimeText: View {
+    /// The time the train is now due.
+    let time: Date
+    /// How far behind the timetable that is. Zero for on time.
+    let lateBy: TimeInterval
+    let clock: (Date) -> String
+    /// The first column is heavier than the arrival columns.
+    let isDeparture: Bool
+
+    var body: some View {
+        if lateBy > 0 {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(clock(time.addingTimeInterval(-lateBy)))
+                    .font(isDeparture ? .subheadline : .footnote)
+                    .strikethrough()
+                    .foregroundStyle(.secondary)
+                Text(clock(time))
+                    .font(isDeparture ? .body.weight(.semibold) : .callout)
+                    .foregroundStyle(.yellow)
+            }
+        } else {
+            Text(clock(time))
+                .font(isDeparture ? .body.weight(.semibold) : .callout)
+                .foregroundStyle(isDeparture ? .primary : .secondary)
+        }
     }
 }

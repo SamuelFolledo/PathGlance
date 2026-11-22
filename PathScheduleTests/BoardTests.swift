@@ -242,13 +242,68 @@ struct BoardPlanTests {
         #expect(live.board(at: saturday).lines.allSatisfy { $0.delay == .none })
     }
 
-    @Test func thePreviewMarksWhatAnOptionChanged() {
-        let merged = WidgetPreviewCard.merge(old: "33rd 7:10, 7:20", new: "33rd 7:10→7:33, 7:20")
-        #expect(merged.map(\.text) == ["33rd", "7:10,", "7:10→7:33,", "7:20"])
-        #expect(merged.map(\.change) == [.none, .removed, .added, .none])
-        #expect(WidgetPreviewCard.merge(old: "", new: "WTC 7:03").allSatisfy { $0.change == .added })
-        #expect(WidgetPreviewCard.merge(old: "WTC 7:03", new: "").allSatisfy { $0.change == .removed })
-        #expect(WidgetPreviewCard.merge(old: "WTC 7:03", new: "WTC 7:03").allSatisfy { $0.change == .none })
+    // MARK: Fitting times on a line
+
+    @Test func twoDestinationsTryNoMoreThanTheCap() {
+        let board = plan(.journalSquare).board(at: now)
+        #expect(board.counts(cap: 3) == [3, 2, 1])
+        #expect(board.counts(cap: 99) == [8, 7, 6, 5, 4, 3, 2, 1])
+        #expect(board.lines(perLine: 2).map(\.text) == ["33rd 7:10 :20", "WTC 7:03 :13"])
+    }
+
+    @Test func oneDestinationFillsBothRowsWhateverTheCap() {
+        let board = plan(.journalSquare, targets: [.thirtyThirdStreet]).board(at: now)
+        #expect(board.counts(cap: 2) == [8, 7, 6, 5, 4, 3, 2, 1])
+        #expect(board.lines(perLine: 3).map(\.text) == ["33rd 7:10 :20 :30", "7:40 :50 8:00"])
+    }
+
+    // MARK: Late trains
+
+    @Test func aLiveTrainKnowsTheTimetableTimeItReplaces() throws {
+        let saturday = Fixture.date("2026-11-28 07:15")
+        var live = plan(.journalSquare, at: saturday)
+        live.apply(realtime: [Fixture.arrival(.journalSquare, "33rd Street", at: Fixture.date("2026-11-28 07:30"))], now: saturday)
+        let train = try #require(live.groups[0].trains.first)
+        #expect(train.scheduled == Fixture.date("2026-11-28 07:23"))
+        #expect(train.delayMinutes == 7)
+        #expect(train.isLate)
+    }
+
+    @Test func aTrainOnTimeIsNotLate() throws {
+        var live = plan(.journalSquare)
+        live.apply(realtime: [Fixture.arrival(.journalSquare, "33rd Street", at: Fixture.date("2026-11-24 07:11"))], now: now)
+        let train = try #require(live.groups[0].trains.first)
+        #expect(train.delayMinutes == 1)
+        #expect(!train.isLate)
+        // A timetable train is never late by itself.
+        #expect(live.groups[0].trains[1].delayMinutes == 0)
+    }
+
+    @Test func delaysAreWrittenShort() {
+        #expect(TrainTime.delayText(3) == "+3m")
+        #expect(TrainTime.delayText(62) == "+1h2m")
+    }
+}
+
+@Suite("Widget looks")
+struct WidgetLookTests {
+    @Test func theDefaultLookIsTheDefaultPreset() {
+        #expect(WidgetPreset.matching(WidgetLook())?.id == "default")
+        #expect(Set(WidgetPreset.builtIn.map(\.id)).count == WidgetPreset.builtIn.count)
+        #expect(Set(WidgetPreset.builtIn.map(\.look)).count == WidgetPreset.builtIn.count, "Two presets must not look the same")
+    }
+
+    @Test func anEditedPresetMatchesNothing() {
+        var look = WidgetPreset.builtIn[2].look
+        #expect(WidgetPreset.matching(look) != nil)
+        look.style.showArrival.toggle()
+        #expect(WidgetPreset.matching(look) == nil)
+    }
+
+    @Test func aLookSurvivesSavingAndLoading() throws {
+        let look = WidgetLook(font: .serif, style: WidgetStyle(density: .regular, timeFormat: .short, showArrival: true, maxTimes: 4))
+        let loaded = try JSONDecoder().decode(WidgetLook.self, from: JSONEncoder().encode(look))
+        #expect(loaded == look)
     }
 }
 

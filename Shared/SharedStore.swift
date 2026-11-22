@@ -111,6 +111,15 @@ enum SharedStore {
         set { defaults.set(newValue.map(\.rawValue).sorted(), forKey: "hiddenTargets") }
     }
 
+    /// The look the widget draws with: what was last saved in the app.
+    static var widgetLook: WidgetLook {
+        get { WidgetLook(font: fontStyle, style: widgetStyle) }
+        set {
+            fontStyle = newValue.font
+            widgetStyle = newValue.style
+        }
+    }
+
     static var widgetStyle: WidgetStyle {
         get {
             WidgetStyle(
