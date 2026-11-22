@@ -10,19 +10,37 @@ enum SharedStore {
         UserDefaults(suiteName: appGroup) ?? .standard
     }
 
-    private static var scheduleURL: URL? {
+    // MARK: Files
+
+    static func fileURL(_ name: String) -> URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appendingPathComponent("schedule.json")
+            .appendingPathComponent(name)
     }
 
-    static func loadSchedule() -> ScheduleData? {
-        guard let url = scheduleURL, let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ScheduleData.self, from: data)
+    static func read<Value: Decodable>(_ type: Value.Type, from name: String) -> Value? {
+        guard let url = fileURL(name), let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
+    /// Best effort: the logs written this way can be rebuilt, so a failed write is dropped.
+    static func write<Value: Encodable>(_ value: Value, to name: String) {
+        guard let url = fileURL(name), let data = try? JSONEncoder().encode(value) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    // MARK: Schedule
+
+    /// The stored timetable, with the day-type overrides learned so far applied.
+    static func loadSchedule(now: Date = Date()) -> ScheduleData? {
+        guard var schedule = read(ScheduleData.self, from: "schedule.json") else { return nil }
+        schedule.dayOverrides = DayTypeLog.load().overrides(around: now)
+        return schedule
     }
 
     static func save(_ schedule: ScheduleData) throws {
-        guard let url = scheduleURL else {
+        guard let url = fileURL("schedule.json") else {
             throw CocoaError(.fileNoSuchFile)
         }
         let data = try JSONEncoder().encode(schedule)
@@ -57,5 +75,16 @@ enum SharedStore {
     static var useRealtime: Bool {
         get { defaults.object(forKey: "useRealtime") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "useRealtime") }
+    }
+
+    /// Show the alert mark on the lock screen for planned-work notices too. On by default.
+    static var plannedWorkOnLockScreen: Bool {
+        get { defaults.object(forKey: "plannedWorkOnLockScreen") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "plannedWorkOnLockScreen") }
+    }
+
+    static var fontStyle: WidgetFontStyle {
+        get { defaults.string(forKey: "fontStyle").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard }
+        set { defaults.set(newValue.rawValue, forKey: "fontStyle") }
     }
 }

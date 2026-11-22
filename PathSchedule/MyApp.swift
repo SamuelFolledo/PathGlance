@@ -14,11 +14,20 @@ import SwiftUI
             ContentView()
                 .environmentObject(model)
                 .environmentObject(LocationService.shared)
+                .onOpenURL { url in
+                    // A tap on a widget line.
+                    if let line = AppLink.parseLine(url) {
+                        model.openLine = LineRoute(origin: line.origin, target: line.target)
+                    }
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 model.becameActive()
             }
+        }
+        .backgroundTask(.appRefresh(AppModel.refreshTaskID)) {
+            await AppModel.backgroundRefresh()
         }
     }
 }

@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 import CoreLocation
+import AppIntents
 
 struct BoardEntry: TimelineEntry {
     let date: Date
@@ -8,6 +9,7 @@ struct BoardEntry: TimelineEntry {
     /// When this timeline was built, shown in the header.
     let fetchedAt: Date
     var message: String?
+    var fontStyle: WidgetFontStyle = .standard
 
     static var sample: BoardEntry {
         let now = Date()
@@ -17,8 +19,8 @@ struct BoardEntry: TimelineEntry {
         return BoardEntry(
             date: now,
             board: Board(station: .journalSquare, lines: [
-                BoardLine(label: "33rd", times: times([4, 14, 24, 34, 44])),
-                BoardLine(label: "WTC", times: times([2, 8, 14, 20, 26])),
+                BoardLine(label: "33rd", times: times([4, 14, 24, 34, 44]), target: .thirtyThirdStreet),
+                BoardLine(label: "WTC", times: times([2, 8, 14, 20, 26]), target: .worldTradeCenter),
             ]),
             fetchedAt: now
         )
@@ -50,21 +52,44 @@ struct BoardProvider: TimelineProvider {
 
     private static func build() async -> (entries: [BoardEntry], reload: Date) {
         let now = Date()
-        guard let schedule = SharedStore.loadSchedule() else {
-            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable")
+        let fontStyle = SharedStore.fontStyle
+        guard var schedule = SharedStore.loadSchedule(now: now) else {
+            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle)
             return ([entry], now.addingTimeInterval(30 * 60))
         }
 
         let station = await currentStation()
-        var plan = BoardPlan(station: station, schedule: schedule, now: now)
         let useRealtime = SharedStore.useRealtime
-        if useRealtime {
-            let arrivals = await RealtimeFeed.fetch()
-            plan.apply(realtime: arrivals, now: now)
+        async let alertFetch = PathAlertFeed.fetch()
+        let arrivals = useRealtime ? await RealtimeFeed.fetch() : []
+        let alerts = await alertFetch
+
+        // Learn which timetable today is running before the board is built from it.
+        if !arrivals.isEmpty {
+            var dayTypes = DayTypeLog.load()
+            dayTypes.record(arrivals: arrivals, schedule: schedule, now: now)
+            dayTypes.save()
+            schedule.dayOverrides = dayTypes.overrides(around: now)
         }
 
+        var plan = BoardPlan(station: station, schedule: schedule, now: now)
+        plan.apply(realtime: arrivals, now: now)
+
+        var issues = IssueLog.load()
+        if let alerts {
+            issues.merge(alerts: alerts, now: now)
+        }
+        if useRealtime, !arrivals.isEmpty {
+            let late = plan.groups
+                .filter { $0.delay == .major }
+                .map { (origin: station, target: $0.target, minutes: $0.delayMinutes) }
+            issues.noteDetectedDelays(late, at: station, now: now)
+        }
+        issues.save()
+        plan.apply(issues: issues.active, includePlannedWork: SharedStore.plannedWorkOnLockScreen)
+
         let entries = plan.refreshDates(from: now).map { date in
-            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now)
+            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle)
         }
         // Reload regularly to pick up a new station and fresh predictions.
         // The app also reloads the widget whenever the station changes.
@@ -93,18 +118,31 @@ struct BoardView: View {
     let entry: BoardEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 0) {
             if let board = entry.board {
-                Text("From \(board.station.shortName): \(CompactTimes.clock(entry.fetchedAt))")
-                    .fontWeight(.semibold)
+                HStack(spacing: 4) {
+                    Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(entry.fetchedAt))")
+                    // Inactive while the phone is locked; works once Face ID has unlocked it.
+                    Button(intent: RefreshBoardIntent()) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    if board.hasAlert {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                    }
+                }
+                .font(entry.fontStyle.headerFont)
                 if board.lines.isEmpty {
                     Text("No upcoming trains")
                 }
                 ForEach(board.lines, id: \.self) { line in
-                    if line.label.isEmpty {
-                        Text(line.timesText)
+                    if let target = line.target {
+                        // Each line opens its own list of trains in the app.
+                        Link(destination: AppLink.line(from: board.station, to: target)) {
+                            Text(line.text)
+                        }
                     } else {
-                        Text("\(Text(line.label).fontWeight(.semibold)) \(line.timesText)")
+                        Text(line.text)
                     }
                 }
             } else {
@@ -112,7 +150,7 @@ struct BoardView: View {
                     .lineLimit(3)
             }
         }
-        .font(.system(size: 13).monospacedDigit())
+        .font(entry.fontStyle.bodyFont)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, alignment: .leading)

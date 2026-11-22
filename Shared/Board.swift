@@ -1,18 +1,44 @@
 import Foundation
 
 /// One line on the lock screen, for example "33rd 7:10 :30 :50 8:00 :10".
+/// How far a line is running behind the timetable.
+enum DelayLevel: Int, Comparable, Sendable {
+    case none, minor, major
+
+    /// Shown after the line label: "33rd?" for a small delay, "33rd!" for a big one.
+    var marker: String {
+        switch self {
+        case .none: return ""
+        case .minor: return "?"
+        case .major: return "!"
+        }
+    }
+
+    static func < (lhs: DelayLevel, rhs: DelayLevel) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
 struct BoardLine: Hashable, Sendable {
     /// Empty for the second line when one destination fills both lines.
     var label: String
     var times: [Date]
+    var delay: DelayLevel = .none
+    /// The destination this line lists, for opening its full list in the app.
+    var target: Station?
 
     var timesText: String { CompactTimes.string(times) }
+
+    /// "33rd? 7:16 :30 :50 8:00 :10"
+    var text: String {
+        label.isEmpty ? timesText : "\(label)\(delay.marker) \(timesText)"
+    }
 }
 
 struct Board: Hashable, Sendable {
     var station: Station
     /// Zero, one or two lines.
     var lines: [BoardLine]
+    /// An open PATH alert that is not tied to one of the lines shown.
+    var hasAlert = false
 }
 
 enum BoardRules {
@@ -42,6 +68,12 @@ enum CompactTimes {
     static func clock(_ date: Date) -> String {
         let parts = PathTime.calendar.dateComponents([.hour, .minute], from: date)
         return "\(hour12(parts.hour ?? 0)):\(twoDigits(parts.minute ?? 0))"
+    }
+
+    /// "7:05 AM" in New York time.
+    static func clockWithPeriod(_ date: Date) -> String {
+        let hour = PathTime.calendar.component(.hour, from: date)
+        return "\(clock(date)) \(hour < 12 ? "AM" : "PM")"
     }
 
     /// "7:10 :30 :50 8:00 :10". The hour is dropped when it repeats.
@@ -74,20 +106,33 @@ struct BoardPlan: Sendable {
     struct Group: Sendable {
         var target: Station
         var trains: [TrainTime]
+        /// Timetable times from shortly before now onwards, kept to measure delays against.
+        var timetable: [Date] = []
+        var delay: DelayLevel = .none
+        /// Minutes the next live train is behind the timetable.
+        var delayMinutes = 0
     }
 
     /// A train stays on the board for this long after its departure time.
     static let grace: TimeInterval = 60
+    /// PATH says trains may run three minutes either side of the timetable; flag beyond that.
+    static let minorDelay = 5
+    static let majorDelay = 10
 
     let station: Station
     var groups: [Group]
+    var hasAlert = false
 
-    init(station: Station, schedule: ScheduleData, now: Date) {
+    /// `targets` defaults to the station's board rules.
+    init(station: Station, targets: [Station]? = nil, schedule: ScheduleData, now: Date, limit: Int = 60) {
         self.station = station
-        self.groups = BoardRules.targets(from: station).map { target in
-            Group(
+        self.groups = (targets ?? BoardRules.targets(from: station)).map { target in
+            let all = schedule.departures(from: station, to: target, after: now.addingTimeInterval(-30 * 60), limit: limit + 40)
+            let visibleFrom = now.addingTimeInterval(-BoardPlan.grace)
+            return Group(
                 target: target,
-                trains: schedule.departures(from: station, to: target, after: now.addingTimeInterval(-BoardPlan.grace), limit: 60)
+                trains: Array(all.filter { $0.time > visibleFrom }.prefix(limit)),
+                timetable: all.map(\.time)
             )
         }
     }
@@ -105,24 +150,54 @@ struct BoardPlan: Sendable {
                     for other in targets where RealtimeFeed.serves(headSign: arrival.headSign, from: station, to: other) {
                         downstream |= other.bit
                     }
-                    return TrainTime(time: arrival.arrival, downstream: downstream)
+                    return TrainTime(time: arrival.arrival, downstream: downstream, isLive: true)
                 }
                 .sorted { $0.time < $1.time }
-            guard let lastLive = live.last else { continue }
+            guard let firstLive = live.first, let lastLive = live.last else { continue }
+
+            // The next live train is the latest scheduled one it could be: trains rarely
+            // run more than three minutes early. On a frequent line a long delay looks
+            // like the following train on time, which is why PATH's alerts count as well.
+            if let scheduled = groups[index].timetable.last(where: { $0 <= firstLive.time.addingTimeInterval(3 * 60) }) {
+                let minutes = Int(firstLive.time.timeIntervalSince(scheduled) / 60)
+                // A gap of half an hour or more is a break in service, not a late train.
+                if minutes >= BoardPlan.minorDelay, minutes < 30 {
+                    groups[index].delayMinutes = minutes
+                    groups[index].delay = minutes >= BoardPlan.majorDelay ? .major : .minor
+                }
+            }
+
             // Scheduled trains close to the last live prediction are the same trains.
             let cutoff = lastLive.time.addingTimeInterval(4 * 60)
             groups[index].trains = live + groups[index].trains.filter { $0.time > cutoff }
         }
     }
 
+    /// Marks the lines PATH's open alerts name, and notes any alert that names none.
+    mutating func apply(issues: [Issue], includePlannedWork: Bool) {
+        for issue in issues where issue.isActive && !issue.detected && issue.kind != .elevator {
+            if issue.affectedLines.isEmpty {
+                if issue.kind != .plannedWork || includePlannedWork { hasAlert = true }
+                continue
+            }
+            for index in groups.indices where issue.affects(from: station, to: groups[index].target) {
+                groups[index].delay = .major
+            }
+        }
+    }
+
     func board(at date: Date, perLine: Int = 5) -> Board {
         let visibleFrom = date.addingTimeInterval(-BoardPlan.grace)
         let upcoming = groups
-            .map { group in Group(target: group.target, trains: group.trains.filter { $0.time > visibleFrom }) }
+            .map { group -> Group in
+                var copy = group
+                copy.trains = group.trains.filter { $0.time > visibleFrom }
+                return copy
+            }
             .filter { !$0.trains.isEmpty }
 
         guard let first = upcoming.first else {
-            return Board(station: station, lines: [])
+            return Board(station: station, lines: [], hasAlert: hasAlert)
         }
 
         if upcoming.count >= 2 {
@@ -135,24 +210,26 @@ struct BoardPlan: Sendable {
                 && a.allSatisfy { $0.serves(second.target) }
                 && b.allSatisfy { $0.serves(first.target) }
             if sameTrains {
-                return Board(station: station, lines: filled(label: "All", trains: first.trains, perLine: perLine))
+                var both = first
+                both.delay = max(first.delay, second.delay)
+                return Board(station: station, lines: filled(label: "All", group: both, perLine: perLine), hasAlert: hasAlert)
             }
             return Board(station: station, lines: [
-                BoardLine(label: first.target.lineLabel, times: a.map(\.time)),
-                BoardLine(label: second.target.lineLabel, times: b.map(\.time)),
-            ])
+                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target),
+                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target),
+            ], hasAlert: hasAlert)
         }
 
-        return Board(station: station, lines: filled(label: first.target.lineLabel, trains: first.trains, perLine: perLine))
+        return Board(station: station, lines: filled(label: first.target.lineLabel, group: first, perLine: perLine), hasAlert: hasAlert)
     }
 
-    private func filled(label: String, trains: [TrainTime], perLine: Int) -> [BoardLine] {
-        let times = trains.map(\.time)
+    private func filled(label: String, group: Group, perLine: Int) -> [BoardLine] {
+        let times = group.trains.map(\.time)
         let firstLine = Array(times.prefix(perLine))
         let secondLine = Array(times.dropFirst(perLine).prefix(perLine))
-        var lines = [BoardLine(label: label, times: firstLine)]
+        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target)]
         if !secondLine.isEmpty {
-            lines.append(BoardLine(label: "", times: secondLine))
+            lines.append(BoardLine(label: "", times: secondLine, target: group.target))
         }
         return lines
     }

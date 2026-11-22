@@ -7,6 +7,17 @@ enum PathTime {
         calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
         return calendar
     }()
+
+    /// `yyyymmdd` in New York time.
+    static func ymd(of date: Date) -> Int {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return (parts.year ?? 0) * 10_000 + (parts.month ?? 0) * 100 + (parts.day ?? 0)
+    }
+
+    /// Midnight in New York at the start of a `yyyymmdd` day.
+    static func date(fromYMD ymd: Int) -> Date? {
+        calendar.date(from: DateComponents(year: ymd / 10_000, month: ymd / 100 % 100, day: ymd % 100))
+    }
 }
 
 /// One scheduled departure from a station. Encoded as `[minute, service, downstream]`
@@ -64,6 +75,8 @@ struct TrainTime: Hashable, Sendable {
     var time: Date
     /// Stations the train reaches after this stop (see `Station.bit`).
     var downstream: Int
+    /// A live prediction, not a timetable time.
+    var isLive = false
 
     func serves(_ station: Station) -> Bool {
         downstream & station.bit != 0
@@ -78,6 +91,14 @@ struct ScheduleData: Codable, Sendable {
     var services: [ServiceCalendar]
     /// Keyed by `Station.rawValue`, sorted by `minute`.
     var departures: [String: [Departure]]
+    /// Dates (`yyyymmdd`) that run a different service than the calendar says, such as a
+    /// holiday on the Sunday timetable. Values index `services`. Filled in after loading
+    /// from what `DayTypeLog` has learned; not part of the stored file.
+    var dayOverrides: [Int: Int] = [:]
+
+    private enum CodingKeys: String, CodingKey {
+        case importedAt, feedVersion, feedEnd, services, departures
+    }
 
     /// Upcoming departures from `origin` on trips that later stop at `target`.
     func departures(from origin: Station, to target: Station, after date: Date, limit: Int) -> [TrainTime] {
@@ -102,6 +123,9 @@ struct ScheduleData: Codable, Sendable {
             for index in services.indices
             where services[index].isActive(on: ymd, weekdayIndex: weekdayIndex, ignoringEnd: expired) {
                 active.insert(index)
+            }
+            if let override = dayOverrides[ymd], services.indices.contains(override) {
+                active = [override]
             }
             if active.isEmpty { continue }
 

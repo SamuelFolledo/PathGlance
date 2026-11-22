@@ -1,11 +1,9 @@
 import SwiftUI
 import CoreLocation
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var location: LocationService
-    @State private var showingFileImporter = false
 
     private var station: Station {
         model.manualStation ?? location.station ?? .journalSquare
@@ -15,15 +13,24 @@ struct ContentView: View {
         NavigationStack {
             List {
                 previewSection
+                issuesSection
                 stationSection
                 scheduleSection
-                optionsSection
+                lockScreenSection
+                Section {
+                    NavigationLink("Archive") {
+                        ArchiveView()
+                    }
+                } footer: {
+                    Text("Past issues, every timetable downloaded, and what the app has learned about holiday service.")
+                }
             }
             .navigationTitle("PathSchedule")
-            .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.zip]) { result in
-                if case .success(let url) = result {
-                    Task { await model.importSchedule(fromFile: url) }
-                }
+            .navigationDestination(item: $model.openLine) { route in
+                DeparturesView(route: route)
+            }
+            .refreshable {
+                await model.refreshIssues()
             }
         }
     }
@@ -33,12 +40,27 @@ struct ContentView: View {
     private var previewSection: some View {
         Section {
             TimelineView(.periodic(from: .now, by: 30)) { context in
-                BoardPreview(station: station, schedule: model.schedule, date: context.date)
+                BoardPreview(station: station, schedule: model.schedule, issues: model.issues.active,
+                             includePlannedWork: model.plannedWorkOnLockScreen, date: context.date) { target in
+                    model.openLine = LineRoute(origin: station, target: target)
+                }
             }
         } header: {
             Text("Lock screen preview")
         } footer: {
-            Text("Add it from the lock screen: touch and hold, Customize, Lock Screen, then pick PathSchedule in the widget row.")
+            Text("Tap a line for every train until the end of tomorrow. A ? after a line means a short delay, ! a long one. Add the widget from the lock screen: touch and hold, Customize, Lock Screen, then pick PathSchedule.")
+        }
+    }
+
+    private var issuesSection: some View {
+        Section("Current issues") {
+            if model.issues.active.isEmpty {
+                Label("No issues reported", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(model.issues.active) { issue in
+                IssueRow(issue: issue)
+            }
         }
     }
 
@@ -65,13 +87,9 @@ struct ContentView: View {
     private var scheduleSection: some View {
         Section {
             if let schedule = model.schedule {
-                LabeledContent("Updated", value: schedule.importedAt.formatted(date: .abbreviated, time: .shortened))
+                LabeledContent("Checked", value: schedule.importedAt.formatted(date: .abbreviated, time: .shortened))
                 if let version = schedule.feedVersion {
                     LabeledContent("Timetable", value: version)
-                }
-                if schedule.isExpired() {
-                    Label("This timetable has passed its end date. Times follow its regular weekly pattern until PATH publishes a new one.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
                 }
             } else {
                 Text("No schedule downloaded yet.")
@@ -88,10 +106,6 @@ struct ContentView: View {
                 }
             }
             .disabled(model.isImporting)
-            Button("Import GTFS zip from Files") {
-                showingFileImporter = true
-            }
-            .disabled(model.isImporting)
             if let error = model.errorMessage {
                 Text(error)
                     .font(.footnote)
@@ -100,15 +114,23 @@ struct ContentView: View {
         } header: {
             Text("Schedule")
         } footer: {
-            Text("Read from the timetables on PATH's website and refreshed daily when you open the app.")
+            Text("Read from the timetables on PATH's website. Checked about once a day, in the background and whenever you open the app.")
         }
     }
 
-    private var optionsSection: some View {
+    private var lockScreenSection: some View {
         Section {
+            Picker("Font", selection: $model.fontStyle) {
+                ForEach(WidgetFontStyle.allCases) { style in
+                    Text(style.name).tag(style)
+                }
+            }
             Toggle("Adjust with real-time arrivals", isOn: $model.useRealtime)
+            Toggle("Alert mark for planned work", isOn: $model.plannedWorkOnLockScreen)
+        } header: {
+            Text("Lock screen")
         } footer: {
-            Text("Replaces the first time or two on each line with the Port Authority's live prediction when the widget refreshes.")
+            Text("Real-time replaces the first time or two on each line with PATH's live prediction. The alert mark appears beside the station name for open PATH alerts; elevator notices never show it.")
         }
     }
 
@@ -124,23 +146,44 @@ struct ContentView: View {
     }
 }
 
-/// The same three lines the lock screen widget draws.
+/// The same three lines the lock screen widget draws, from the timetable and open alerts.
 private struct BoardPreview: View {
     let station: Station
     let schedule: ScheduleData?
+    let issues: [Issue]
+    let includePlannedWork: Bool
     let date: Date
+    let open: (Station) -> Void
+
+    private var board: Board? {
+        guard let schedule else { return nil }
+        var plan = BoardPlan(station: station, schedule: schedule, now: date)
+        plan.apply(issues: issues, includePlannedWork: includePlannedWork)
+        return plan.board(at: date)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("From \(station.shortName): \(CompactTimes.clock(date))")
-                .fontWeight(.semibold)
-            if let schedule {
-                let board = BoardPlan(station: station, schedule: schedule, now: date).board(at: date)
+            if let board {
+                HStack(spacing: 4) {
+                    Text("From \(station.shortName): \(CompactTimes.clockWithPeriod(date))")
+                    if board.hasAlert {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .font(.system(.footnote, design: .monospaced).weight(.semibold))
                 if board.lines.isEmpty {
                     Text("No upcoming trains")
                 }
                 ForEach(board.lines, id: \.self) { line in
-                    Text(line.label.isEmpty ? line.timesText : "\(line.label) \(line.timesText)")
+                    Button {
+                        if let target = line.target { open(target) }
+                    } label: {
+                        Text(line.text)
+                            .foregroundStyle(line.delay == .none ? Color.primary : Color.yellow)
+                    }
+                    .buttonStyle(.plain)
                 }
             } else {
                 Text("Download the schedule below")

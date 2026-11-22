@@ -36,6 +36,7 @@
 		000000000000000000000031 /* PathSchedule.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathSchedule.entitlements; sourceTree = "<group>"; };
 		000000000000000000000032 /* PathScheduleWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathScheduleWidget.entitlements; sourceTree = "<group>"; };
 		000000000000000000000033 /* PathScheduleWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathScheduleWidget-Info.plist"; sourceTree = "<group>"; };
+		000000000000000000000034 /* PathSchedule-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathSchedule-Info.plist"; sourceTree = "<group>"; };
 		000000000000000000000120 /* PathSchedule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathSchedule.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000220 /* PathScheduleWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathScheduleWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -98,6 +99,7 @@
 				000000000000000000000031 /* PathSchedule.entitlements */,
 				000000000000000000000032 /* PathScheduleWidget.entitlements */,
 				000000000000000000000033 /* PathScheduleWidget-Info.plist */,
+				000000000000000000000034 /* PathSchedule-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -361,6 +363,7 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -399,6 +402,7 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
