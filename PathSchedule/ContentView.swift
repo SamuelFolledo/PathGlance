@@ -66,6 +66,9 @@ struct ContentView: View {
         Section {
             if let schedule = model.schedule {
                 LabeledContent("Updated", value: schedule.importedAt.formatted(date: .abbreviated, time: .shortened))
+                if let version = schedule.feedVersion {
+                    LabeledContent("Timetable", value: version)
+                }
                 if schedule.isExpired() {
                     Label("This timetable has passed its end date. Times follow its regular weekly pattern until PATH publishes a new one.", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
@@ -97,7 +100,7 @@ struct ContentView: View {
         } header: {
             Text("Schedule")
         } footer: {
-            Text("Downloaded from PATH's published timetable and refreshed weekly when you open the app.")
+            Text("Read from the timetables on PATH's website and refreshed daily when you open the app.")
         }
     }
 

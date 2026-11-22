@@ -10,9 +10,13 @@ WTC 7:08 :14 :20 :26 :32
 
 ## How it works
 
-- **Schedule**: the app downloads PATH's published GTFS feed, reduces it to a compact
-  `schedule.json` in the App Group container, and refreshes it weekly on launch.
-  If the download fails, save the GTFS zip to Files and use "Import GTFS zip from Files".
+- **Schedule**: the app reads the weekday, Saturday and Sunday timetables behind PATH's
+  Schedules and Maps web pages (`WebTimetableImporter`), reduces them to a compact
+  `schedule.json` in the App Group container, and refreshes it daily on launch.
+  This is not a documented API: if the page changes shape the import fails and the last
+  good schedule is kept. Holiday and one-off construction timetables are not covered.
+  PATH's GTFS feed is only a first-run fallback, because it has been left stale for long
+  periods (its last version ended 2026-06-01). "Import GTFS zip from Files" still works.
 - **Station**: nearest of the 13 stations. The widget reads its own location when allowed,
   and the app updates it in the background through station geofences ("Always" permission).
   You can also pin a station in the app.

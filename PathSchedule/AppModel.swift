@@ -31,14 +31,24 @@ final class AppModel: ObservableObject {
     /// Called whenever the app comes to the foreground.
     func becameActive() {
         LocationService.shared.refresh()
-        let weekOld = schedule.map { Date().timeIntervalSince($0.importedAt) > 7 * 24 * 60 * 60 } ?? true
-        if weekOld {
+        // PATH changes timetables without notice, and the page is a small download.
+        let stale = schedule.map { Date().timeIntervalSince($0.importedAt) > 24 * 60 * 60 } ?? true
+        if stale {
             Task { await downloadSchedule() }
         }
     }
 
+    /// PATH's own web timetable first. The GTFS feed is older, so it is only used to get
+    /// started when the web timetable cannot be read; it never replaces a schedule we have.
     func downloadSchedule() async {
-        await importSchedule { try await GTFSImporter.download() }
+        let haveSchedule = schedule != nil
+        await importSchedule {
+            do {
+                return try await WebTimetableImporter.download()
+            } catch where !haveSchedule {
+                return try await GTFSImporter.download()
+            }
+        }
     }
 
     /// Fallback when the download fails: a GTFS zip saved to Files.
