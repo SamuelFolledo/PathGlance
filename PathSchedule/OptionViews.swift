@@ -16,7 +16,7 @@ struct LockScreenOptionsView: View {
                         // Each font is named in itself, with a sample line.
                         VStack(alignment: .leading, spacing: 2) {
                             Text(style.name)
-                                .font(style.font(size: 19, weight: .semibold))
+                                .font(style.font(size: 17, weight: .semibold))
                             Text("33rd? 7:16, 7:30, 7:50")
                                 .font(style.font(size: 15))
                                 .foregroundStyle(.secondary)
@@ -120,7 +120,6 @@ struct FavoriteStopsView: View {
                     Text(station.name)
                 }
                 .accessibilityIdentifier("favorite-\(station.rawValue)")
-                Divider()
             }
         }
         .infoPopover("Favorite stops",

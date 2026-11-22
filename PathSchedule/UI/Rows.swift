@@ -40,26 +40,40 @@ private struct InfoPopoverModifier: ViewModifier {
     }
 }
 
-/// One of several: the picked option carries the check mark.
-struct RadioRow<Label: View>: View {
-    let isSelected: Bool
+/// The one row every choice in a sheet is made of: a mark, a label, a hairline under it.
+/// `RadioRow` and `CheckRow` only differ in the mark, so every list of choices looks alike.
+private struct ChoiceRow<Label: View>: View {
+    let symbol: String
+    let isOn: Bool
     let action: () -> Void
     @ViewBuilder let label: Label
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                Image(systemName: symbol)
                     .font(.title3)
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 label
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 11)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// One of several: the picked option carries the filled mark.
+struct RadioRow<Label: View>: View {
+    let isSelected: Bool
+    let action: () -> Void
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        ChoiceRow(symbol: isSelected ? "largecircle.fill.circle" : "circle", isOn: isSelected, action: action) { label }
     }
 }
 
@@ -70,23 +84,38 @@ struct CheckRow<Label: View>: View {
     @ViewBuilder let label: Label
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                label
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 8)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
+        ChoiceRow(symbol: isOn ? "checkmark.circle.fill" : "circle", isOn: isOn, action: action) { label }
     }
 }
 
-/// A titled group that folds away, showing its current value when closed.
+/// A row that opens a sheet or popup: title, current value, and a chevron pointing right.
+struct OpenRow: View {
+    let title: String
+    var value: String = ""
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(value)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A titled group that folds away, showing its current value when closed. The title is
+/// larger than the rows inside it and always in the system font.
 struct FoldSection<Content: View>: View {
     let title: String
     var value: String = ""
@@ -100,7 +129,7 @@ struct FoldSection<Content: View>: View {
             } label: {
                 HStack {
                     Text(title)
-                        .font(.body.weight(.semibold))
+                        .font(.title3.weight(.bold))
                     Spacer()
                     Text(value)
                         .foregroundStyle(.secondary)
@@ -109,17 +138,34 @@ struct FoldSection<Content: View>: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isOpen ? 90 : 0))
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .overlay(alignment: .bottom) { Divider() }
             .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+            .accessibilityAddTraits(.isHeader)
             if isOpen {
                 content
                     .padding(.leading, 4)
-                    .padding(.bottom, 8)
             }
-            Divider()
         }
+    }
+}
+
+/// A station as a round badge with its two or three characters, like a person's avatar.
+struct StationBadge: View {
+    let station: Station
+    var size: CGFloat = 44
+
+    var body: some View {
+        Text(station.badge)
+            .font(.system(size: size * (station.badge.count > 2 ? 0.3 : 0.4), weight: .bold, design: .rounded))
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(.tint, in: .circle)
+            .accessibilityLabel(station.name)
     }
 }

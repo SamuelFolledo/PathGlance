@@ -48,6 +48,8 @@ enum PathFormat {
 
 struct IssueRow: View {
     let issue: Issue
+    /// One of the issues the tab's red badge is counting.
+    var countsOnBadge = false
     let open: (Issue) -> Void
 
     var body: some View {
@@ -75,6 +77,14 @@ struct IssueRow: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if countsOnBadge {
+                    // The same red as the tab's badge: this is one of the issues it counts.
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 10, height: 10)
+                        .padding(.top, 5)
+                        .accessibilityLabel("Counted on the Issues badge")
+                }
             }
             .contentShape(.rect)
         }
@@ -153,10 +163,10 @@ struct IssuesView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(model.issues.active) { issue in
-                        IssueRow(issue: issue) { selected = $0 }
+                        IssueRow(issue: issue, countsOnBadge: issue.kind != .elevator) { selected = $0 }
                     }
                 } header: {
-                    Text("Current")
+                    Text(model.badgeIssues.isEmpty ? "Current" : "Current · red dot = counted on the badge")
                 }
                 ForEach(days, id: \.day) { entry in
                     Section {

@@ -52,14 +52,16 @@ final class PathScheduleUITests: XCTestCase {
     func testFavoriteStopAddsAColumn() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
-        app.buttons["favoritesButton"].tap()
+        // Favorite stops are edited from the station menu.
+        app.buttons["originMenu"].firstMatch.tap()
+        app.buttons["Favorite stops"].firstMatch.tap()
         let newport = app.buttons["favorite-newport"]
         XCTAssertTrue(newport.waitForExistence(timeout: 5))
         if !newport.isSelected { newport.tap() }
         let christopher = app.buttons["favorite-christopherStreet"]
         if !christopher.isSelected { christopher.tap() }
         shot("04-favorites-sheet")
-        XCTAssertTrue(app.tabBars.firstMatch.exists, "The tab bar stays in view under a sheet")
+        XCTAssertTrue(app.buttons["tab-issues"].exists, "The tab bar stays in view over a sheet")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Newport"].waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
         shot("05-columns")
@@ -76,6 +78,12 @@ final class PathScheduleUITests: XCTestCase {
         onScreen[0].tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
         shot("06-stops-sheet")
+        // The arrows step to the next train without closing the sheet.
+        let titleBefore = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' to '")).firstMatch.label
+        app.buttons["laterTrain"].tap()
+        let titleAfter = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' to '")).firstMatch.label
+        XCTAssertNotEqual(titleBefore, titleAfter)
+        XCTAssertTrue(app.buttons["Close"].exists)
         app.buttons["Close"].tap()
     }
 
@@ -99,9 +107,10 @@ final class PathScheduleUITests: XCTestCase {
     }
 
     func testLockScreenOptionsOpenFromPreview() {
-        launch()
-        XCTAssertTrue(picker.waitForExistence(timeout: 30))
-        app.buttons["lockScreenPreview"].tap()
+        launch(tab: "settings")
+        let preview = app.buttons["lockScreenPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 30))
+        preview.tap()
         let serif = app.buttons["font-serif"]
         XCTAssertTrue(serif.waitForExistence(timeout: 5))
         serif.tap()
@@ -109,6 +118,18 @@ final class PathScheduleUITests: XCTestCase {
         shot("09-lock-screen-options")
         app.buttons["font-standard"].tap()
         app.buttons["Close"].tap()
+    }
+
+    func testStationButtonChangesTheStation() {
+        launch()
+        XCTAssertTrue(picker.waitForExistence(timeout: 30))
+        app.buttons["stationButton"].firstMatch.tap()
+        app.buttons["Hoboken"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["From Hoboken. Change station"].firstMatch.waitForExistence(timeout: 5))
+        shot("13-hoboken")
+        // Put it back so later runs start from the default.
+        app.buttons["stationButton"].firstMatch.tap()
+        app.buttons["Journal Square"].firstMatch.tap()
     }
 
     func testSettingsAndIssuesTabs() {
@@ -120,7 +141,7 @@ final class PathScheduleUITests: XCTestCase {
         shot("10-lines-sheet")
         app.buttons["Close"].tap()
 
-        app.tabBars.buttons["Issues"].tap()
+        app.buttons["tab-issues"].tap()
         sleep(1)
         shot("11-issues")
         XCTAssertTrue(app.staticTexts["Issues"].waitForExistence(timeout: 5))

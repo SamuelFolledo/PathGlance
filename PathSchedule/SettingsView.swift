@@ -34,6 +34,12 @@ struct SettingsView: View {
                     .accessibilityAddTraits(.isHeader)
                     .id("top")
                 Section {
+                    WidgetPreviewCard { sheet = .lockScreen }
+                        .infoPopover("Lock screen preview",
+                                     "This is what the widget shows right now.",
+                                     "Tap it to change its look.",
+                                     "A change is pointed out: green for what is added, red for what goes.",
+                                     "A ? after a line means a short delay, ! a long one.")
                     row("Widget options", value: "\(model.fontStyle.name), \(model.widgetStyle.density.name)", opens: .lockScreen)
                         .infoPopover("Widget options", "Font, size, how times are written, which lines show and the extras.")
                     Toggle("Real-time arrivals", isOn: $model.useRealtime)
@@ -126,25 +132,8 @@ struct SettingsView: View {
     }
 
     private func row(_ title: String, value: String, opens target: Sheet) -> some View {
-        Button {
-            sheet = target
-        } label: {
-            HStack {
-                Text(title)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text(value)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.up")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("settings-\(target.rawValue)")
+        OpenRow(title: title, value: value) { sheet = target }
+            .accessibilityIdentifier("settings-\(target.rawValue)")
     }
 
     private var authorizationText: String {

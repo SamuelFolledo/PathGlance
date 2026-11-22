@@ -26,10 +26,13 @@ struct BoardRulesTests {
 
     @Test func destinationTabsListEveryReachableLineEnd() {
         let tabs = BoardRules.destinations(from: .journalSquare, hidden: [], schedule: Fixture.schedule)
-        #expect(tabs == [.thirtyThirdStreet, .worldTradeCenter, .hoboken, .newark])
-        let fewer = BoardRules.destinations(from: .journalSquare, hidden: [.hoboken, .worldTradeCenter], schedule: Fixture.schedule)
+        // Hoboken is only passed through from Journal Square, so it is not a tab.
+        #expect(tabs == [.thirtyThirdStreet, .worldTradeCenter, .newark])
+        let fewer = BoardRules.destinations(from: .journalSquare, hidden: [.worldTradeCenter], schedule: Fixture.schedule)
         #expect(fewer == [.thirtyThirdStreet, .newark])
         #expect(BoardRules.destinations(from: .thirtyThirdStreet, hidden: [], schedule: Fixture.schedule) == [.journalSquare, .hoboken])
+        #expect(Fixture.schedule.terminals(from: .journalSquare) == [.thirtyThirdStreet, .worldTradeCenter, .newark])
+        #expect(Fixture.schedule.terminals(from: .newport) == [.thirtyThirdStreet, .journalSquare, .hoboken, .worldTradeCenter])
     }
 }
 

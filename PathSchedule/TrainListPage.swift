@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One destination's trains: days stacked top to bottom, each under a pinned header with
-/// the date and the column names.
+/// One destination's trains: the date and column names fixed on top, the days stacked
+/// below. The rows come from `TrainListCache`, worked out off the main thread.
 struct TrainListPage: View {
     let origin: Station
     let target: Station
@@ -9,13 +9,15 @@ struct TrainListPage: View {
     let now: Date
     let arrivals: [RealtimeArrival]
     let dayTypes: DayTypeLog
-    let onSelectTrain: (TrainTime) -> Void
+    let onSelectTrain: (TrainTime, [TrainTime]) -> Void
     let onPickDate: () -> Void
+    let onRefresh: () async -> Void
 
     @EnvironmentObject private var model: AppModel
-    @State private var list = TrainList()
+    @State private var list: TrainList?
     @State private var topID: Double?
-    @State private var isBuilt = false
+    /// Goes up each time the list is moved from here, so the rows take the new position.
+    @State private var moves = 0
     @ScaledMetric(relativeTo: .subheadline) private var columnWidth: CGFloat = 76
 
     /// What the rows are built from; a change rebuilds them.
@@ -41,75 +43,66 @@ struct TrainListPage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            // The departure column plus as many arrival columns as fit, always keeping the
-            // destination (the last one).
-            let fit = max(1, Int((proxy.size.width - 32) / columnWidth) - 1)
-            let columns = Array(list.columns.suffix(fit))
-            let skipped = list.columns.count - columns.count
+            if let list {
+                // The departure column plus as many arrival columns as fit, always keeping
+                // the destination (the last one).
+                let fit = max(1, Int((proxy.size.width - 32) / columnWidth) - 1)
+                let skipped = max(0, list.columns.count - fit)
 
-            VStack(spacing: 0) {
-                // The date and column names stay put above the list and follow the day
-                // that is scrolled to the top.
-                if let day = list.day(containing: topID) {
-                    dayBar(day, columns: columns)
-                }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(list.days) { day in
-                            dayHeading(day)
-                                .id(day.headerID)
-                            if day.rows.isEmpty {
-                                Text("No trains to \(target.name) on this day.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .padding(16)
-                            }
-                            ForEach(day.rows) { row in
-                                rowView(row, skipped: skipped)
-                                    .id(row.id)
-                            }
-                        }
+                VStack(spacing: 0) {
+                    if let day = list.day(containing: topID) {
+                        dayBar(day, columns: Array(list.columns.dropFirst(skipped)))
                     }
-                    .scrollTargetLayout()
+                    // Equatable: scrolling changes `topID` many times a second, and the
+                    // rows must not be laid out again for that.
+                    TrainRows(list: list, origin: origin, target: target, skipped: skipped, moves: moves, topID: $topID,
+                              onSelectTrain: { onSelectTrain($0, list.trains) },
+                              onSettle: { if isSelected { model.listAnchor = TrainList.time(of: $0) } },
+                              onRefresh: onRefresh)
+                        .equatable()
                 }
-                .scrollPosition(id: $topID, anchor: .top)
-                .onScrollPhaseChange { _, phase in
-                    // Once scrolling settles, the other destinations' lists follow this one.
-                    if phase == .idle, isSelected, let topID {
-                        model.listAnchor = TrainList.time(of: topID)
-                    }
-                }
+            } else {
+                ProgressView("Loading trains")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: buildKey) {
             guard let schedule = model.schedule else { return }
-            list = TrainList.build(schedule: schedule, origin: origin, target: target, favorites: model.favoriteStops,
-                                   arrivals: arrivals, issues: model.issues.active, dayTypes: dayTypes, now: now)
-            if !isBuilt {
-                isBuilt = true
-                topID = list.rowID(for: model.listAnchor)
-            }
+            let isFirst = list == nil
+            let built = await model.trainLists.list(schedule: schedule, origin: origin, target: target, favorites: model.favoriteStops,
+                                                    arrivals: arrivals, issues: model.issues.active, dayTypes: dayTypes, now: now)
+            guard !Task.isCancelled else { return }
+            list = built
+            if isFirst { move(to: model.listAnchor, in: built) }
         }
         .onChange(of: model.listAnchor) { _, anchor in
-            if !isSelected { topID = list.rowID(for: anchor) }
+            if !isSelected { move(to: anchor, in: list) }
         }
         .onChange(of: model.jumpCount) {
-            withAnimation(isSelected ? .snappy : nil) { topID = list.rowID(for: model.listAnchor) }
+            move(to: model.listAnchor, in: list)
         }
     }
 
-    // MARK: Rows
+    /// Puts the first train at or after `time` at the top. Not animated: a jump can cross
+    /// days of rows that are not laid out yet, and an animated scroll through them stalls.
+    private func move(to time: Date, in list: TrainList?) {
+        guard let id = list?.rowID(for: time) else { return }
+        topID = id
+        moves += 1
+    }
 
     /// Fixed above the list: the day at the top (tap for the calendar), any holiday
-    /// warning, and the column names.
+    /// warning, and the column names. Today is in the accent color.
     private func dayBar(_ day: TrainList.Day, columns: [Station]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(action: onPickDate) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(day.title)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     Image(systemName: "calendar")
-                        .font(.footnote)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
                 .contentShape(.rect)
@@ -140,22 +133,70 @@ struct TrainListPage: View {
         .padding(.vertical, 8)
         .overlay(alignment: .bottom) { Divider() }
     }
+}
 
-    /// Where one day ends and the next begins in the list.
+/// The scrolling rows of a train list. Redrawn only when the list itself changes.
+private struct TrainRows: View, Equatable {
+    let list: TrainList
+    let origin: Station
+    let target: Station
+    /// Leading columns left out because they do not fit.
+    let skipped: Int
+    /// Changes when the list was moved in code, which must reach the scroll view.
+    let moves: Int
+    @Binding var topID: Double?
+    let onSelectTrain: (TrainTime) -> Void
+    let onSettle: (Double) -> Void
+    let onRefresh: () async -> Void
+
+    static func == (lhs: TrainRows, rhs: TrainRows) -> Bool {
+        lhs.list.version == rhs.list.version && lhs.skipped == rhs.skipped && lhs.moves == rhs.moves
+            && lhs.origin == rhs.origin && lhs.target == rhs.target
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(list.days) { day in
+                    dayHeading(day)
+                        .id(day.headerID)
+                    if day.rows.isEmpty {
+                        Text("No trains to \(target.name) on this day.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(16)
+                    }
+                    ForEach(day.rows) { row in
+                        rowView(row)
+                            .id(row.id)
+                    }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollPosition(id: $topID, anchor: .top)
+        .onScrollPhaseChange { _, phase in
+            // Once scrolling settles, the other destinations' lists follow this one.
+            if phase == .idle, let topID { onSettle(topID) }
+        }
+        .refreshable { await onRefresh() }
+    }
+
+    /// Where one day ends and the next begins. Today's is in the accent color.
     private func dayHeading(_ day: TrainList.Day) -> some View {
         Text(day.title)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, 16)
             .padding(.bottom, 6)
             .background(Color(.tertiarySystemGroupedBackground))
             .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder
-    private func rowView(_ row: TrainList.Row, skipped: Int) -> some View {
+    private func rowView(_ row: TrainList.Row) -> some View {
         switch row.kind {
         case .routeChange(let name):
             HStack(spacing: 8) {
@@ -201,21 +242,23 @@ struct TrainListPage: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .contentShape(.rect)
-                .opacity(row.isPast ? 0.45 : 1)
+                .opacity(row.isPast ? 0.4 : 1)
             }
             .buttonStyle(.plain)
+            // A train that has gone is shown for reference only.
+            .disabled(row.isPast)
             .overlay(alignment: .bottom) {
                 Divider().padding(.leading, 16)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(spoken(train, cells: allCells))
-            .accessibilityHint("Shows every stop")
+            .accessibilityLabel(spoken(train, cells: allCells, isPast: row.isPast))
+            .accessibilityHint(row.isPast ? "" : "Shows every stop")
             .accessibilityAddTraits(.isButton)
         }
     }
 
-    private func spoken(_ train: TrainTime, cells: [Date?]) -> String {
-        var parts = ["Departs \(CompactTimes.clockWithPeriod(train.time))" + (train.isLive ? ", live" : "")]
+    private func spoken(_ train: TrainTime, cells: [Date?], isPast: Bool) -> String {
+        var parts = [(isPast ? "Departed " : "Departs ") + CompactTimes.clockWithPeriod(train.time) + (train.isLive ? ", live" : "")]
         for (stop, arrival) in zip(list.columns, cells) {
             if let arrival { parts.append("\(stop.name) \(CompactTimes.clockWithPeriod(arrival))") }
         }

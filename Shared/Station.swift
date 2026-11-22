@@ -80,6 +80,25 @@ enum Station: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
+    /// Two or three characters for the round station badge.
+    var badge: String {
+        switch self {
+        case .newark: return "NWK"
+        case .harrison: return "HAR"
+        case .journalSquare: return "JSQ"
+        case .groveStreet: return "GRV"
+        case .exchangePlace: return "EXP"
+        case .worldTradeCenter: return "WTC"
+        case .newport: return "NPT"
+        case .hoboken: return "HOB"
+        case .christopherStreet: return "CHR"
+        case .ninthStreet: return "9"
+        case .fourteenthStreet: return "14"
+        case .twentyThirdStreet: return "23"
+        case .thirtyThirdStreet: return "33"
+        }
+    }
+
     /// Station code used by the Port Authority real-time feed (`consideredStation`).
     var realtimeCode: String {
         switch self {

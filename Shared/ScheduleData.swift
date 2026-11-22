@@ -162,6 +162,29 @@ struct ScheduleData: Codable, Sendable {
         return runsViaHoboken(train, from: origin) ? "\(terminal.shortName) via Hob" : terminal.shortName
     }
 
+    /// Minutes from `origin` to every later stop of a train with this routing. One lookup
+    /// table per routing is much cheaper than a keyed lookup per stop per train.
+    func rideTable(from origin: Station, downstream: Int) -> [Station: Int] {
+        var table: [Station: Int] = [:]
+        for stop in Station.allCases where stop != origin && downstream & stop.bit != 0 {
+            table[stop] = rideMinutes(from: origin, to: stop, downstream: downstream)
+        }
+        return table
+    }
+
+    /// The stations where trains from `origin` end their runs. A stop a train only passes
+    /// through on the way (Hoboken, for Journal Square's overnight trains) is not one.
+    func terminals(from origin: Station) -> Set<Station> {
+        var result = Set<Station>()
+        for pattern in Set((departures[origin.rawValue] ?? []).map(\.downstream)) {
+            let table = rideTable(from: origin, downstream: pattern)
+            if let last = table.max(by: { $0.value < $1.value })?.key {
+                result.insert(last)
+            }
+        }
+        return result
+    }
+
     /// Whether any train from `origin` later stops at `target`.
     func reaches(from origin: Station, to target: Station) -> Bool {
         origin != target && (departures[origin.rawValue] ?? []).contains { $0.downstream & target.bit != 0 }

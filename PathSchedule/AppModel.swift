@@ -27,14 +27,19 @@ final class AppModel: ObservableObject {
     @Published private(set) var resetCount: [AppTab: Int] = [:]
 
     // What the Trains tab is showing.
-    /// `nil` follows the widget's station (pinned or nearest).
-    @Published var browseOrigin: Station?
+    /// Set when a widget line is tapped while the widget is at another station than the
+    /// app would pick. Cleared as soon as the user chooses a station.
+    @Published private(set) var visitingStation: Station?
     @Published var browseTarget: Station?
+    /// Train lists already worked out, reused when switching back and forth.
+    let trainLists = TrainListCache()
     /// The time at the top of the train list. Every destination's list keeps to it, so
     /// switching destination stays on the same day and hour.
     @Published var listAnchor = Date()
     /// Goes up when the lists should move to `listAnchor` (a jump to a date, back to now).
     @Published private(set) var jumpCount = 0
+    /// Goes up when the favorite stops sheet should open on the Trains tab.
+    @Published private(set) var favoritesRequests = 0
 
     // MARK: Preferences
 
@@ -90,18 +95,44 @@ final class AppModel: ObservableObject {
     func select(_ newTab: AppTab) {
         if newTab == tab {
             resetCount[newTab, default: 0] += 1
-            if newTab == .trains { jump(to: Date()) }
+            if newTab == .trains {
+                visitingStation = nil
+                jump(to: Date())
+            }
         } else {
             tab = newTab
         }
     }
 
+    /// The station everything starts from: one the widget sent us to, else the one the
+    /// user chose, else the nearest, else Journal Square.
+    func station(nearest: Station?) -> Station {
+        visitingStation ?? manualStation ?? nearest ?? .journalSquare
+    }
+
+    /// Chooses the "from" station and remembers it. `nil` follows the nearest station.
+    func chooseStation(_ station: Station?) {
+        visitingStation = nil
+        manualStation = station
+    }
+
     /// Shows today's trains from `origin` towards `target`, as when a widget line is tapped.
     func open(origin: Station, target: Station) {
-        browseOrigin = origin
+        visitingStation = origin == (manualStation ?? LocationService.shared.station ?? .journalSquare) ? nil : origin
         browseTarget = target
         tab = .trains
         jump(to: Date())
+    }
+
+    /// Opens the favorite stops sheet, from wherever the station menu was used.
+    func editFavorites() {
+        tab = .trains
+        favoritesRequests += 1
+    }
+
+    /// Open issues that count towards the Issues badge: everything but elevator notices.
+    var badgeIssues: [Issue] {
+        issues.active.filter { $0.kind != .elevator }
     }
 
     /// Moves every train list to `date`.

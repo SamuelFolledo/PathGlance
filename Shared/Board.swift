@@ -80,12 +80,13 @@ extension BoardRules {
         return kept.isEmpty ? rules : kept
     }
 
-    /// The destination tabs in the app: the widget's lines, then the other line ends
-    /// trains from `station` reach, without the ones turned off.
+    /// The destination tabs in the app: the widget's lines, then the other stations where
+    /// trains from `station` end, without the ones turned off. Hoboken is not a tab at
+    /// Journal Square: trains only pass through it there.
     static func destinations(from station: Station, hidden: Set<Station>, schedule: ScheduleData) -> [Station] {
         var result = widgetTargets(from: station, hidden: hidden)
-        for terminal in terminals where !result.contains(terminal) && !hidden.contains(terminal)
-            && schedule.reaches(from: station, to: terminal) {
+        let ends = schedule.terminals(from: station)
+        for terminal in terminals where !result.contains(terminal) && !hidden.contains(terminal) && ends.contains(terminal) {
             result.append(terminal)
         }
         return result

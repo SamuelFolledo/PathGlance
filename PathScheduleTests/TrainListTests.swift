@@ -92,12 +92,33 @@ struct TrainListTests {
         let today = built.days[7]
         let past = today.rows.filter(\.isPast)
         #expect(!past.isEmpty)
-        let upcoming = trains(TrainList.Day(id: 0, date: now, title: "", rows: today.rows.filter { !$0.isPast }))
+        // Every train on an earlier day has gone too.
+        #expect(built.days[6].rows.compactMap(\.train).count == built.days[6].rows.filter(\.isPast).count)
+        let upcoming = trains(TrainList.Day(id: 0, date: now, title: "", rows: today.rows.filter { !$0.isPast && $0.train != nil }))
         #expect(upcoming.first?.train.time == Fixture.date("2026-11-24 07:12"))
         #expect(upcoming.first?.train.isLive == true)
         #expect(upcoming.dropFirst().first?.train.time == Fixture.date("2026-11-24 07:20"))
         // Other days have no past rows.
         #expect(built.days[8].rows.allSatisfy { !$0.isPast })
+    }
+
+    @Test func theCacheGivesTheSameListAndKeepsOtherDays() async {
+        let cache = await TrainListCache()
+        let first = await cache.list(schedule: schedule, origin: .journalSquare, target: .thirtyThirdStreet, favorites: [.newport],
+                                     arrivals: [], issues: [], dayTypes: DayTypeLog(), now: now)
+        let direct = list(.journalSquare, .thirtyThirdStreet, favorites: [.newport])
+        #expect(first.days.map(\.id) == direct.days.map(\.id))
+        #expect(first.days.map { $0.rows.map(\.id) } == direct.days.map { $0.rows.map(\.id) })
+        #expect(first.columns == direct.columns)
+
+        // A minute later with a live train: today changes, the other days are the cached ones.
+        let later = now.addingTimeInterval(60)
+        let live = [Fixture.arrival(.journalSquare, "33rd Street", at: Fixture.date("2026-11-24 07:12"))]
+        let second = await cache.list(schedule: schedule, origin: .journalSquare, target: .thirtyThirdStreet, favorites: [.newport],
+                                      arrivals: live, issues: [], dayTypes: DayTypeLog(), now: later)
+        #expect(second.days[7].rows.contains { $0.train?.isLive == true })
+        #expect(second.days[9].rows.map(\.id) == first.days[9].rows.map(\.id))
+        #expect(second.version != first.version)
     }
 
     @Test func rowsAreInTimeOrderWithUniqueIDs() {
