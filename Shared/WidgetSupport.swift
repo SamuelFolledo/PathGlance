@@ -36,7 +36,7 @@ enum WidgetFontStyle: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    private func font(size: CGFloat, weight: Font.Weight) -> Font {
+    func font(size: CGFloat, weight: Font.Weight = .medium) -> Font {
         let font = Font.system(size: size, weight: weight, design: design)
         return self == .condensed ? font.width(.condensed) : font.monospacedDigit()
     }

@@ -40,6 +40,10 @@ WTC 7:08 :14 :20 :26 :32
 
 ## What each station shows
 
+These are the defaults. Settings > Destinations lets you list preferred destinations
+(a line's end or any stop); the widget then shows the first two that trains from the
+current station reach.
+
 | Station | Lines |
 | --- | --- |
 | Journal Square | 33rd, WTC |
@@ -55,7 +59,9 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
 
 ## Layout
 
-- `PathSchedule/` app: timetable import and archive, location, issue and archive screens, settings
+- `PathSchedule/` app (iOS 26): three tabs. Trains (lock screen preview, then trains by
+  station, destination and day), Issues (current and archived) and Settings. Also the
+  timetable import and archive, and location
 - `PathScheduleWidget/` widget extension
 - `Shared/` compiled into both: stations, schedule queries, board rules, real-time feed,
   alerts and the issue log, day-type learning, widget fonts and links

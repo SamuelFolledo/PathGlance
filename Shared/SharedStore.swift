@@ -83,6 +83,19 @@ enum SharedStore {
         set { defaults.set(newValue, forKey: "plannedWorkOnLockScreen") }
     }
 
+    /// Destinations the widget should list when trains from the current station reach
+    /// them, in order of preference. Empty means the built-in rules for each station.
+    static var favoriteTargets: [Station] {
+        get { (defaults.stringArray(forKey: "favoriteTargets") ?? []).compactMap(Station.init(rawValue:)) }
+        set { defaults.set(newValue.map(\.rawValue), forKey: "favoriteTargets") }
+    }
+
+    /// Show when the first train on each widget line reaches its destination. Off by default.
+    static var showArrivalOnWidget: Bool {
+        get { defaults.bool(forKey: "showArrivalOnWidget") }
+        set { defaults.set(newValue, forKey: "showArrivalOnWidget") }
+    }
+
     static var fontStyle: WidgetFontStyle {
         get { defaults.string(forKey: "fontStyle").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard }
         set { defaults.set(newValue.rawValue, forKey: "fontStyle") }

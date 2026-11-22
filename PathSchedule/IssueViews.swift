@@ -118,8 +118,8 @@ struct IssueDetailView: View {
     }
 }
 
-/// Ended issues, one section per day, most recent day and end time first.
-struct ArchivedIssuesView: View {
+/// Open issues first, then ended ones: one section per day, most recent day and end time first.
+struct IssuesView: View {
     @EnvironmentObject private var model: AppModel
 
     private var days: [(day: Int, issues: [Issue])] {
@@ -130,20 +130,31 @@ struct ArchivedIssuesView: View {
     }
 
     var body: some View {
-        List {
-            if days.isEmpty {
-                Text("No past issues yet.")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(days, id: \.day) { entry in
-                Section(PathTime.date(fromYMD: entry.day).map(PathFormat.dayWithYear) ?? "") {
-                    ForEach(entry.issues) { issue in
+        NavigationStack {
+            List {
+                Section("Current") {
+                    if model.issues.active.isEmpty {
+                        Label("No issues reported", systemImage: "checkmark.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(model.issues.active) { issue in
                         IssueRow(issue: issue)
                     }
                 }
+                ForEach(days, id: \.day) { entry in
+                    Section {
+                        ForEach(entry.issues) { issue in
+                            IssueRow(issue: issue)
+                        }
+                    } header: {
+                        Text("Archived · " + (PathTime.date(fromYMD: entry.day).map(PathFormat.dayWithYear) ?? ""))
+                    }
+                }
+            }
+            .navigationTitle("Issues")
+            .refreshable {
+                await model.refreshIssues()
             }
         }
-        .navigationTitle("Archived issues")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }

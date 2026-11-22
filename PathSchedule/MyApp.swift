@@ -17,7 +17,7 @@ import SwiftUI
                 .onOpenURL { url in
                     // A tap on a widget line.
                     if let line = AppLink.parseLine(url) {
-                        model.openLine = LineRoute(origin: line.origin, target: line.target)
+                        model.open(origin: line.origin, target: line.target)
                     }
                 }
         }

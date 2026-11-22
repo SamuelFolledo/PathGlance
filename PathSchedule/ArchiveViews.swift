@@ -1,27 +1,5 @@
 import SwiftUI
 
-struct ArchiveView: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        List {
-            NavigationLink {
-                ArchivedIssuesView()
-            } label: {
-                LabeledContent("Archived issues", value: "\(model.issues.archived.count)")
-            }
-            NavigationLink("Timetables") {
-                TimetableArchiveView()
-            }
-            NavigationLink("Learned day types") {
-                DayTypeLogView()
-            }
-        }
-        .navigationTitle("Archive")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 /// Each distinct timetable downloaded from PATH's website.
 struct TimetableArchiveView: View {
     @State private var entries: [TimetableArchive.Entry] = []

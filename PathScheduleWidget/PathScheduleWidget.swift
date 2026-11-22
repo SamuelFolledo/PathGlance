@@ -72,7 +72,9 @@ struct BoardProvider: TimelineProvider {
             schedule.dayOverrides = dayTypes.overrides(around: now)
         }
 
-        var plan = BoardPlan(station: station, schedule: schedule, now: now)
+        let targets = BoardRules.widgetTargets(from: station, favorites: SharedStore.favoriteTargets, schedule: schedule)
+        var plan = BoardPlan(station: station, targets: targets, schedule: schedule, now: now)
+        plan.showArrival = SharedStore.showArrivalOnWidget
         plan.apply(realtime: arrivals, now: now)
 
         var issues = IssueLog.load()
@@ -120,17 +122,18 @@ struct BoardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let board = entry.board {
-                HStack(spacing: 4) {
-                    Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(entry.fetchedAt))")
-                    // Inactive while the phone is locked; works once Face ID has unlocked it.
-                    Button(intent: RefreshBoardIntent()) {
+                // The whole header row refreshes: station, live times and alerts are all
+                // read again. Inactive while the phone is locked; works once it is unlocked.
+                Button(intent: RefreshBoardIntent()) {
+                    HStack(spacing: 4) {
+                        Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(entry.fetchedAt))")
                         Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.plain)
-                    if board.hasAlert {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        if board.hasAlert {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                        }
                     }
                 }
+                .buttonStyle(.plain)
                 .font(entry.fontStyle.headerFont)
                 if board.lines.isEmpty {
                     Text("No upcoming trains")

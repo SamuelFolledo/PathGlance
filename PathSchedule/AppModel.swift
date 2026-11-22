@@ -3,12 +3,8 @@ import Combine
 import WidgetKit
 import BackgroundTasks
 
-/// A list of trains opened from a widget line or the in-app preview.
-struct LineRoute: Hashable, Identifiable {
-    var origin: Station
-    var target: Station
-
-    var id: String { "\(origin.rawValue)-\(target.rawValue)" }
+enum AppTab: Hashable {
+    case trains, issues, settings
 }
 
 @MainActor
@@ -19,7 +15,28 @@ final class AppModel: ObservableObject {
     @Published private(set) var issues = IssueLog()
     @Published private(set) var isImporting = false
     @Published var errorMessage: String?
-    @Published var openLine: LineRoute?
+    @Published var tab: AppTab = .trains
+
+    // What the Trains tab is showing.
+    /// `nil` follows the widget's station (pinned or nearest).
+    @Published var browseOrigin: Station?
+    @Published var browseTarget: Station?
+    /// Days from today: -7 through 14.
+    @Published var dayOffset = 0
+
+    @Published var favoriteTargets: [Station] {
+        didSet {
+            SharedStore.favoriteTargets = favoriteTargets
+            reloadWidgets()
+        }
+    }
+
+    @Published var showArrivalOnWidget: Bool {
+        didSet {
+            SharedStore.showArrivalOnWidget = showArrivalOnWidget
+            reloadWidgets()
+        }
+    }
 
     @Published var manualStation: Station? {
         didSet {
@@ -56,6 +73,22 @@ final class AppModel: ObservableObject {
         useRealtime = SharedStore.useRealtime
         plannedWorkOnLockScreen = SharedStore.plannedWorkOnLockScreen
         fontStyle = SharedStore.fontStyle
+        favoriteTargets = SharedStore.favoriteTargets
+        showArrivalOnWidget = SharedStore.showArrivalOnWidget
+        // "-startTab issues" on the command line opens on that tab, for screenshots.
+        switch UserDefaults.standard.string(forKey: "startTab") {
+        case "issues": tab = .issues
+        case "settings": tab = .settings
+        default: break
+        }
+    }
+
+    /// Shows today's trains from `origin` towards `target`, as when a widget line is tapped.
+    func open(origin: Station, target: Station) {
+        browseOrigin = origin
+        browseTarget = target
+        dayOffset = 0
+        tab = .trains
     }
 
     /// Called whenever the app comes to the foreground.
@@ -65,7 +98,8 @@ final class AppModel: ObservableObject {
         schedule = SharedStore.loadSchedule()
         issues = IssueLog.load()
         // PATH changes timetables without notice, and the page is a small download.
-        let stale = schedule.map { Date().timeIntervalSince($0.importedAt) > 24 * 60 * 60 } ?? true
+        // A file from an older build has no ride times, so it is replaced too.
+        let stale = schedule.map { Date().timeIntervalSince($0.importedAt) > 24 * 60 * 60 || $0.travel == nil } ?? true
         if stale {
             Task { await downloadSchedule() }
         }

@@ -96,8 +96,39 @@ struct ScheduleData: Codable, Sendable {
     /// from what `DayTypeLog` has learned; not part of the stored file.
     var dayOverrides: [Int: Int] = [:]
 
+    init(importedAt: Date, feedVersion: String?, feedEnd: Int?, services: [ServiceCalendar],
+         departures: [String: [Departure]], travel: [String: Int]? = nil) {
+        self.importedAt = importedAt
+        self.feedVersion = feedVersion
+        self.feedEnd = feedEnd
+        self.services = services
+        self.departures = departures
+        self.travel = travel
+    }
+
+    /// Typical ride time in minutes, keyed by `travelKey`. Missing in files saved by older builds.
+    var travel: [String: Int]?
+
     private enum CodingKeys: String, CodingKey {
-        case importedAt, feedVersion, feedEnd, services, departures
+        case importedAt, feedVersion, feedEnd, services, departures, travel
+    }
+
+    /// `downstream` pins the routing (direct or via Hoboken); `nil` is the general figure.
+    static func travelKey(from origin: Station, to target: Station, downstream: Int?) -> String {
+        "\(origin.rawValue)>\(target.rawValue)" + (downstream.map { ">\($0)" } ?? "")
+    }
+
+    /// When `train`, boarded at `origin`, is due at `target`.
+    func arrival(of train: TrainTime, from origin: Station, to target: Station) -> Date? {
+        guard let travel else { return nil }
+        let minutes = travel[ScheduleData.travelKey(from: origin, to: target, downstream: train.downstream)]
+            ?? travel[ScheduleData.travelKey(from: origin, to: target, downstream: nil)]
+        return minutes.map { train.time.addingTimeInterval(TimeInterval($0 * 60)) }
+    }
+
+    /// Whether any train from `origin` later stops at `target`.
+    func reaches(from origin: Station, to target: Station) -> Bool {
+        origin != target && (departures[origin.rawValue] ?? []).contains { $0.downstream & target.bit != 0 }
     }
 
     /// Upcoming departures from `origin` on trips that later stop at `target`.

@@ -24,8 +24,11 @@ struct BoardLine: Hashable, Sendable {
     var delay: DelayLevel = .none
     /// The destination this line lists, for opening its full list in the app.
     var target: Station?
+    /// When the first train reaches `target`, if the widget is set to show it.
+    var arrival: Date?
 
-    var timesText: String { CompactTimes.string(times) }
+    /// "7:16 :30 :50", or "7:16→:35 :30 :50" with the first train's arrival time.
+    var timesText: String { CompactTimes.string(times, arrivalOfFirst: arrival) }
 
     /// "33rd? 7:16 :30 :50 8:00 :10"
     var text: String {
@@ -63,6 +66,20 @@ enum BoardRules {
     }
 }
 
+extension BoardRules {
+    /// The widget's lines: the user's favourite destinations that trains from `station`
+    /// reach, topped up from the station's rules. With no favourites it is the rules alone.
+    static func widgetTargets(from station: Station, favorites: [Station], schedule: ScheduleData) -> [Station] {
+        let rules = targets(from: station)
+        var result = Array(favorites.filter { schedule.reaches(from: station, to: $0) }.prefix(2))
+        guard !result.isEmpty else { return rules }
+        for target in rules where result.count < 2 && !result.contains(target) {
+            result.append(target)
+        }
+        return result
+    }
+}
+
 enum CompactTimes {
     /// "7:05" in New York time, 12-hour, no AM/PM.
     static func clock(_ date: Date) -> String {
@@ -77,15 +94,22 @@ enum CompactTimes {
     }
 
     /// "7:10 :30 :50 8:00 :10". The hour is dropped when it repeats.
-    static func string(_ times: [Date]) -> String {
+    static func string(_ times: [Date], arrivalOfFirst: Date? = nil) -> String {
         var parts: [String] = []
         var lastHour: Int?
-        for time in times {
+        func short(_ time: Date) -> String {
             let components = PathTime.calendar.dateComponents([.hour, .minute], from: time)
             let hour = hour12(components.hour ?? 0)
             let minute = twoDigits(components.minute ?? 0)
-            parts.append(hour == lastHour ? ":\(minute)" : "\(hour):\(minute)")
-            lastHour = hour
+            defer { lastHour = hour }
+            return hour == lastHour ? ":\(minute)" : "\(hour):\(minute)"
+        }
+        for (index, time) in times.enumerated() {
+            var part = short(time)
+            if index == 0, let arrivalOfFirst {
+                part += "→" + short(arrivalOfFirst)
+            }
+            parts.append(part)
         }
         return parts.joined(separator: " ")
     }
@@ -122,10 +146,14 @@ struct BoardPlan: Sendable {
     let station: Station
     var groups: [Group]
     var hasAlert = false
+    /// Put the first train's arrival time at its destination on each line.
+    var showArrival = false
+    private let schedule: ScheduleData
 
     /// `targets` defaults to the station's board rules.
     init(station: Station, targets: [Station]? = nil, schedule: ScheduleData, now: Date, limit: Int = 60) {
         self.station = station
+        self.schedule = schedule
         self.groups = (targets ?? BoardRules.targets(from: station)).map { target in
             let all = schedule.departures(from: station, to: target, after: now.addingTimeInterval(-30 * 60), limit: limit + 40)
             let visibleFrom = now.addingTimeInterval(-BoardPlan.grace)
@@ -149,6 +177,14 @@ struct BoardPlan: Sendable {
                     var downstream = 0
                     for other in targets where RealtimeFeed.serves(headSign: arrival.headSign, from: station, to: other) {
                         downstream |= other.bit
+                    }
+                    // The feed has no stop list, so borrow the routing (direct or via
+                    // Hoboken) of the scheduled train this prediction is closest to.
+                    let nearest = groups[index].trains.min {
+                        abs($0.time.timeIntervalSince(arrival.arrival)) < abs($1.time.timeIntervalSince(arrival.arrival))
+                    }
+                    if let nearest, abs(nearest.time.timeIntervalSince(arrival.arrival)) <= 15 * 60 {
+                        downstream |= nearest.downstream
                     }
                     return TrainTime(time: arrival.arrival, downstream: downstream, isLive: true)
                 }
@@ -215,19 +251,24 @@ struct BoardPlan: Sendable {
                 return Board(station: station, lines: filled(label: "All", group: both, perLine: perLine), hasAlert: hasAlert)
             }
             return Board(station: station, lines: [
-                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target),
-                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target),
+                BoardLine(label: first.target.lineLabel, times: a.map(\.time), delay: first.delay, target: first.target, arrival: arrival(in: first)),
+                BoardLine(label: second.target.lineLabel, times: b.map(\.time), delay: second.delay, target: second.target, arrival: arrival(in: second)),
             ], hasAlert: hasAlert)
         }
 
         return Board(station: station, lines: filled(label: first.target.lineLabel, group: first, perLine: perLine), hasAlert: hasAlert)
     }
 
+    private func arrival(in group: Group) -> Date? {
+        guard showArrival, let train = group.trains.first else { return nil }
+        return schedule.arrival(of: train, from: station, to: group.target)
+    }
+
     private func filled(label: String, group: Group, perLine: Int) -> [BoardLine] {
         let times = group.trains.map(\.time)
         let firstLine = Array(times.prefix(perLine))
         let secondLine = Array(times.dropFirst(perLine).prefix(perLine))
-        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target)]
+        var lines = [BoardLine(label: label, times: firstLine, delay: group.delay, target: group.target, arrival: arrival(in: group))]
         if !secondLine.isEmpty {
             lines.append(BoardLine(label: "", times: secondLine, target: group.target))
         }

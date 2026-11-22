@@ -63,6 +63,7 @@ enum WebTimetableImporter {
         let weekendPage = try page(endingWith: "/schedules-maps/weekend-schedules")
 
         var departures: [String: [Departure]] = [:]
+        var travelSamples: [String: [Int]] = [:]
         var trainCounts = [DayType: Int]()
 
         func addLists(_ lists: [[String: Any]], dayType: (String) -> DayType?) throws {
@@ -74,7 +75,7 @@ enum WebTimetableImporter {
                 var html: [String] = []
                 collectText(in: list, into: &html)
                 for table in html.flatMap(tables(in:)) {
-                    trainCounts[day, default: 0] += try add(table: table, service: day.rawValue, to: &departures)
+                    trainCounts[day, default: 0] += try add(table: table, service: day.rawValue, to: &departures, travel: &travelSamples)
                 }
             }
         }
@@ -114,7 +115,8 @@ enum WebTimetableImporter {
             feedVersion: effective,
             feedEnd: nil,
             services: DayType.allCases.map(\.calendar),
-            departures: departures
+            departures: departures,
+            travel: travelSamples.mapValues { samples in samples.sorted()[samples.count / 2] }
         )
     }
 
@@ -184,7 +186,7 @@ enum WebTimetableImporter {
     }
 
     /// Adds one table's trains and returns how many it held.
-    private static func add(table: [[String]], service: Int, to departures: inout [String: [Departure]]) throws -> Int {
+    private static func add(table: [[String]], service: Int, to departures: inout [String: [Departure]], travel: inout [String: [Int]]) throws -> Int {
         guard let header = table.first, header.count >= 2 else { return 0 }
         let stations = try header.map { cell -> Station in
             guard let station = station(forHeader: cell) else {
@@ -215,11 +217,17 @@ enum WebTimetableImporter {
 
             var downstream = 0
             // Walk backwards so each stop knows every station still ahead of it.
-            for call in calls.reversed() {
+            for (index, call) in calls.enumerated().reversed() {
                 let reachable = downstream & ~call.station.bit
                 if reachable != 0 {
                     departures[call.station.rawValue, default: []]
                         .append(Departure(minute: call.minute, service: service, downstream: reachable))
+                    // Ride times to each later stop, both for this exact routing and in general.
+                    for later in calls[(index + 1)...] where later.station != call.station {
+                        let minutes = later.minute - call.minute
+                        travel[ScheduleData.travelKey(from: call.station, to: later.station, downstream: reachable), default: []].append(minutes)
+                        travel[ScheduleData.travelKey(from: call.station, to: later.station, downstream: nil), default: []].append(minutes)
+                    }
                 }
                 downstream |= call.station.bit
             }
