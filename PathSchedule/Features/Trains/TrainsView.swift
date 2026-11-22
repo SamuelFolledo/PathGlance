@@ -321,12 +321,26 @@ struct StopsView: View {
             }
             .animation(Theme.Motion.content, value: train)
 
-            // One page per train. The page follows the finger and the next train slides in.
+            // A sideways scroll of lazy pages guesses its own height and can come out short,
+            // cutting off the last stop, so the height is taken from this train's own page.
+            StopsPage(schedule: schedule, origin: origin, target: target, train: train, hasLeft: hasLeft(train))
+                .hidden()
+                .accessibilityHidden(true)
+                .overlay(alignment: .top) { pager }
+        }
+    }
+
+    private func hasLeft(_ train: TrainTime) -> Bool {
+        !train.isLive && train.time <= now.addingTimeInterval(-BoardPlan.grace)
+    }
+
+    /// One page per train. The page follows the finger and the next train slides in.
+    private var pager: some View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 0) {
                     ForEach(trains, id: \.time) { other in
                         StopsPage(schedule: schedule, origin: origin, target: target, train: other,
-                                  hasLeft: !other.isLive && other.time <= now.addingTimeInterval(-BoardPlan.grace))
+                                  hasLeft: hasLeft(other))
                             .containerRelativeFrame(.horizontal)
                             .id(id(other))
                     }
@@ -348,7 +362,6 @@ struct StopsView: View {
                 }
             }
             .onAppear { page = id(train) }
-        }
     }
 }
 

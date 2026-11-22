@@ -102,6 +102,10 @@ final class PathScheduleUITests: XCTestCase {
         let time = app.descendants(matching: .any)["stopsTime"].firstMatch
         XCTAssertTrue(app.buttons["laterTrain"].waitForExistence(timeout: 5))
         shot("04-stops-sheet")
+        // Pushing the content up shows the last stop whole, above the tab bar.
+        let stopsStart = time.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        stopsStart.press(forDuration: 0.05, thenDragTo: stopsStart.withOffset(CGVector(dx: 0, dy: -250)))
+        shot("04b-stops-scrolled")
         // The arrow turns to the next train without closing the sheet.
         let before = time.label
         app.buttons["laterTrain"].tap()
