@@ -112,7 +112,7 @@ final class PathScheduleUITests: XCTestCase {
         let trains = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'"))
         XCTAssertTrue(trains.firstMatch.waitForExistence(timeout: 10))
         // Rows above and below the screen exist too; take one that can be tapped.
-        let onScreen = trains.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY > 300 && $0.frame.maxY < 700 }
+        let onScreen = trains.allElementsBoundByIndex.filter { $0.frame.minY > 300 && $0.frame.maxY < 700 }.filter(\.isHittable)
         XCTAssertFalse(onScreen.isEmpty)
         onScreen[0].tap()
         let time = app.descendants(matching: .any)["stopsTime"].firstMatch

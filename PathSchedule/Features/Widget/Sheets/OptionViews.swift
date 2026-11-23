@@ -38,6 +38,8 @@ struct LinesShownRows: View {
 /// A check row per station. Each checked stop gets an arrival-time column in the train list.
 struct FavoriteStopsView: View {
     @EnvironmentObject private var model: AppModel
+    /// For UI tests: the list is on the Trains tab's sheet and on the Widget tab.
+    var idPrefix = "favorite"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,7 +52,7 @@ struct FavoriteStopsView: View {
                 .infoPopover(station.name,
                              "Checked: \(station.name) gets a column of arrival times in the train list.",
                              "It only shows when trains to the chosen destination call there on the way.")
-                .accessibilityIdentifier("favorite-\(station.rawValue)")
+                .accessibilityIdentifier("\(idPrefix)-\(station.rawValue)")
             }
             if !model.favoriteStops.isEmpty {
                 Button("Clear all", role: .destructive) {
@@ -69,7 +71,7 @@ struct FavoriteStopsView: View {
                     })
                 }
                 .padding(.vertical, Theme.Spacing.md)
-                .accessibilityIdentifier("clearFavorites")
+                .accessibilityIdentifier(idPrefix == "favorite" ? "clearFavorites" : "\(idPrefix)-clear")
             }
         }
     }

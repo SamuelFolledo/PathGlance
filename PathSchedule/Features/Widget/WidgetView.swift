@@ -54,7 +54,8 @@ struct WidgetView: View {
             // The title and the preview stay put above the options, so every change is seen
             // as it is made. Nothing is drawn behind them: the options fade out underneath.
             .pinnedBarTop {
-                VStack(spacing: Theme.Spacing.sm) {
+                // Room between the settings button and the preview under it.
+                VStack(spacing: Theme.Spacing.lg) {
                     titleRow
                     if pinsPreview {
                         preview
@@ -201,14 +202,8 @@ struct WidgetView: View {
             MutedKindRows()
         }
         FoldCard(id: "widget-favorites", title: "Favorite stops", value: model.favoriteStops.isEmpty ? "None" : model.favoriteStops.map(\.shortName).joined(separator: ", ")) {
-            Text(model.favoriteStops.isEmpty ? "None yet" : model.favoriteStops.map(\.name).joined(separator: ", "))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, Theme.Spacing.xs)
-            OpenRow(title: "Edit favorite stops") { model.editFavorites() }
-                .padding(.vertical, Theme.Spacing.row)
-                .accessibilityIdentifier("editFavorites")
-                .infoPopover("Favorite stops", "Each favorite gets a column of arrival times in the Trains tab.", "This opens the list on the Trains tab.")
+            // The same list the Trains tab opens, so a change in either shows in both.
+            FavoriteStopsView(idPrefix: "widgetFavorite")
         }
     }
 }
