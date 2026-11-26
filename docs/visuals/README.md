@@ -8,8 +8,9 @@ The pictures are not files in this repo. They are on private claude.ai pages, op
 
 | Page | What it shows |
 |---|---|
-| [Design page](https://claude.ai/artifact/TMj5EpLq7DHDenccvh7zTh) | Three pages. **Review**: what is waiting on a decision (app icon G5 or G6; Issues list IG, IM, IH, IJ, IK, IL; Widget tab size tabs WS, WH, WX, small widget ideas S1 to S5, and WA to WF). **Features**: decided designs, one section per screen (Trains header U7 and issue strip IN; Issues detail sheet DA; Widget and Settings not decided). **Feat Alternatives**: everything drawn and set aside, grouped by screen, plus every icon on file. |
-| Wireframes | Every alert and guide, and each widget preset with its settings. **Wireframes: https://claude.ai/artifact/2eQQudqAiB5SeDqswTSLt3** |
+| [Design page](https://claude.ai/artifact/TMj5EpLq7DHDenccvh7zTh) | One link, three pages, each grouped into containers by screen. **Review**: what is waiting on a decision (Issues list; Widget tab size tabs; the eleven widget presets for approval). **Features**: what is decided or built (app icon G5; Trains header U7 and issue strip IN; Issues detail sheet DA; Widget; Settings; every alert and guide as built; the planned onboarding carousel). **Feat Alternatives**: everything drawn and set aside, plus every icon on file. |
+
+The separate wireframes page was merged into the design page on 2026-11-26.
 
 ## Rules
 
