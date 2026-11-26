@@ -1,6 +1,6 @@
 # The app
 
-> **Code:** `ContentView` (`PathSchedule/App/ContentView.swift`), `AppModel`, `MyApp`
+> **Code:** `ContentView` (`PathGlance/App/ContentView.swift`), `AppModel`, `MyApp`
 
 ## Summary
 
@@ -22,7 +22,7 @@
 
 ## Name
 
-The app's name is **PathGlance** (display name, site, release script). The Xcode project, targets, bundle IDs (`com.samuelfolledo.PathSchedule`, `.Widget`) and App Group keep the working name PathSchedule. (decided 2026-11-23)
+The app's name is **PathGlance** everywhere: display name, Xcode project, targets, folders, bundle IDs (`com.samuelfolledo.PathGlance`, `.Widget`), App Group (`group.com.samuelfolledo.PathGlance`), site and GitHub repo. (decided 2026-11-23; project and IDs renamed 2026-11-26)
 
 ## Open questions
 

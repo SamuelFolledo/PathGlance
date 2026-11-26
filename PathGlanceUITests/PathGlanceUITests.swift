@@ -3,7 +3,7 @@ import XCTest
 /// Drives the real app against PATH's live data, so these need a network connection.
 /// They check that the screens open and respond, not what the trains are.
 /// Set `TEST_RUNNER_SHOT_DIR` to a folder to keep a screenshot of each step.
-final class PathScheduleUITests: XCTestCase {
+final class PathGlanceUITests: XCTestCase {
     private var app: XCUIApplication!
 
     override func setUp() {

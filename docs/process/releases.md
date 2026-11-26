@@ -11,7 +11,7 @@ Only the menu, cancelling and `release_tool.py` have been run. The archive, the 
 ## One-time setup
 
 1. App Store Connect API key (Users and Access > Integrations > Team Keys, App Manager): the `.p8` goes in `~/.appstoreconnect/private_keys/AuthKey_<KEY ID>.p8`, and the Issuer ID in `~/.appstoreconnect/issuer_id` (or `ASC_ISSUER_ID`).
-2. The app record exists in App Store Connect for `com.samuelfolledo.PathSchedule`.
+2. The app record exists in App Store Connect for `com.samuelfolledo.PathGlance`.
 3. Claude Code CLI on `PATH` (it summarizes commits into release notes).
 4. Copy `scripts/release.env.example` to `scripts/release.local.env` (gitignored) and fill in `ASC_KEY_ID`, `DREAMHOST_USER`, `DREAMHOST_HOST`.
 

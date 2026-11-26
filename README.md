@@ -1,6 +1,6 @@
 # PathGlance
 
-An iPhone app and lock screen widget that show the next PATH trains from the nearest station. The app is named PathGlance; the Xcode project, targets and bundle IDs keep the working name PathSchedule.
+An iPhone app and lock screen widget that show the next PATH trains from the nearest station.
 
 Not made, endorsed or supported by PATH or the Port Authority.
 
@@ -61,7 +61,7 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
 
 ## Layout
 
-- `PathSchedule/` app (iOS 26). Three tabs: Trains (one list per destination with a column
+- `PathGlance/` app (iOS 26). Three tabs: Trains (one list per destination with a column
   per favorite stop, a week back to two weeks ahead), Issues (current and archived) and
   Widget (the lock screen preview, presets and look, with Settings behind its menu button).
   - `App/` the entry point, the tab bar, the model, app facts and links
@@ -71,12 +71,12 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
     (menus and the station list), `Alert/` (guides and their full-width buttons), `Rows/`
     (radio, check, fold, link and open rows, the press-and-hold info popover)
   - `Features/` one folder per tab
-- `PathScheduleWidget/` widget extension
+- `PathGlanceWidget/` widget extension
 - `Shared/` compiled into both: stations, schedule queries, board rules, real-time feed,
   alerts and the issue log, day-type learning, widget fonts and links
-- `PathScheduleTests/` unit tests. They run the real importer on a made-up timetable
+- `PathGlanceTests/` unit tests. They run the real importer on a made-up timetable
   (`Fixture.swift`), so they need no network.
-- `PathScheduleUITests/` UI tests that drive the app against PATH's live data.
+- `PathGlanceUITests/` UI tests that drive the app against PATH's live data.
 - `Config/` entitlements and Info.plists
 - `landing/` the website, and `scripts/` the release script
 - `docs/` everything written down about the app
@@ -96,15 +96,15 @@ Start at [`docs/README.md`](docs/README.md).
 ## Tests
 
 ```
-xcodebuild test -scheme PathSchedule -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild test -scheme PathGlance -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-Add `-only-testing:PathScheduleTests` for the unit tests alone. Set
+Add `-only-testing:PathGlanceTests` for the unit tests alone. Set
 `TEST_RUNNER_SHOT_DIR=/some/folder` to keep a screenshot of each UI test step. More in
 [`docs/process/ui-tests.md`](docs/process/ui-tests.md).
 
 ## Setup
 
-Bundle IDs are `com.samuelfolledo.PathSchedule` and `.Widget`, with App Group
-`group.com.samuelfolledo.PathSchedule`. If you change them, update both entitlements files
+Bundle IDs are `com.samuelfolledo.PathGlance` and `.Widget`, with App Group
+`group.com.samuelfolledo.PathGlance`. If you change them, update both entitlements files
 and `SharedStore.appGroup`.

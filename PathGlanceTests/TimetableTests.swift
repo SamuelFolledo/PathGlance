@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PathSchedule
+@testable import PathGlance
 
 @Suite("Timetable import")
 struct ImporterTests {
@@ -154,6 +154,6 @@ struct StationTests {
         #expect(parsed?.origin == .journalSquare)
         #expect(parsed?.target == .thirtyThirdStreet)
         #expect(AppLink.parseLine(URL(string: "https://example.com/line?from=newark&to=harrison")!) == nil)
-        #expect(AppLink.parseLine(URL(string: "pathschedule://line?from=nowhere&to=harrison")!) == nil)
+        #expect(AppLink.parseLine(URL(string: "pathglance://line?from=nowhere&to=harrison")!) == nil)
     }
 }

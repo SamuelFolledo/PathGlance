@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000100000000"
-               BuildableName = "PathSchedule.app"
-               BlueprintName = "PathSchedule"
-               ReferencedContainer = "container:PathSchedule.xcodeproj">
+               BuildableName = "PathGlance.app"
+               BlueprintName = "PathGlance"
+               ReferencedContainer = "container:PathGlance.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000300000000"
-               BuildableName = "PathScheduleTests.xctest"
-               BlueprintName = "PathScheduleTests"
-               ReferencedContainer = "container:PathSchedule.xcodeproj">
+               BuildableName = "PathGlanceTests.xctest"
+               BlueprintName = "PathGlanceTests"
+               ReferencedContainer = "container:PathGlance.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -43,9 +43,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000400000000"
-               BuildableName = "PathScheduleUITests.xctest"
-               BlueprintName = "PathScheduleUITests"
-               ReferencedContainer = "container:PathSchedule.xcodeproj">
+               BuildableName = "PathGlanceUITests.xctest"
+               BlueprintName = "PathGlanceUITests"
+               ReferencedContainer = "container:PathGlance.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -65,9 +65,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "PathSchedule.app"
-            BlueprintName = "PathSchedule"
-            ReferencedContainer = "container:PathSchedule.xcodeproj">
+            BuildableName = "PathGlance.app"
+            BlueprintName = "PathGlance"
+            ReferencedContainer = "container:PathGlance.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -82,9 +82,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "PathSchedule.app"
-            BlueprintName = "PathSchedule"
-            ReferencedContainer = "container:PathSchedule.xcodeproj">
+            BuildableName = "PathGlance.app"
+            BlueprintName = "PathGlance"
+            ReferencedContainer = "container:PathGlance.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

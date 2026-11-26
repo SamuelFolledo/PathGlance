@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		000000000000000151000000 /* PathScheduleWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000220 /* PathScheduleWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000151000000 /* PathGlanceWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000220 /* PathGlanceWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -16,21 +16,21 @@
 			containerPortal = 000000000000000000000000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000200000000;
-			remoteInfo = PathScheduleWidget;
+			remoteInfo = PathGlanceWidget;
 		};
 		000000000000000361000000 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000000000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000100000000;
-			remoteInfo = PathSchedule;
+			remoteInfo = PathGlance;
 		};
 		000000000000000461000000 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000000000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000100000000;
-			remoteInfo = PathSchedule;
+			remoteInfo = PathGlance;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -40,7 +40,7 @@
 			dstPath = "";
 			dstSubfolder = PlugIns;
 			files = (
-				000000000000000151000000 /* PathScheduleWidget.appex in Embed Foundation Extensions */,
+				000000000000000151000000 /* PathGlanceWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 		};
@@ -48,20 +48,20 @@
 
 /* Begin PBXFileReference section */
 		000000000000000000000035 /* docs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = docs; sourceTree = "<group>"; };
-		000000000000000000000031 /* PathSchedule.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathSchedule.entitlements; sourceTree = "<group>"; };
-		000000000000000000000032 /* PathScheduleWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathScheduleWidget.entitlements; sourceTree = "<group>"; };
-		000000000000000000000033 /* PathScheduleWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathScheduleWidget-Info.plist"; sourceTree = "<group>"; };
-		000000000000000000000034 /* PathSchedule-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathSchedule-Info.plist"; sourceTree = "<group>"; };
-		000000000000000000000120 /* PathSchedule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathSchedule.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000000220 /* PathScheduleWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathScheduleWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000000320 /* PathScheduleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathScheduleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000000420 /* PathScheduleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathScheduleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000031 /* PathGlance.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathGlance.entitlements; sourceTree = "<group>"; };
+		000000000000000000000032 /* PathGlanceWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathGlanceWidget.entitlements; sourceTree = "<group>"; };
+		000000000000000000000033 /* PathGlanceWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathGlanceWidget-Info.plist"; sourceTree = "<group>"; };
+		000000000000000000000034 /* PathGlance-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathGlance-Info.plist"; sourceTree = "<group>"; };
+		000000000000000000000120 /* PathGlance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathGlance.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000220 /* PathGlanceWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathGlanceWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000320 /* PathGlanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathGlanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000420 /* PathGlanceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathGlanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		000000000000000000000010 /* PathSchedule */ = {
+		000000000000000000000010 /* PathGlance */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PathSchedule;
+			path = PathGlance;
 			sourceTree = "<group>";
 		};
 		000000000000000000000011 /* Shared */ = {
@@ -69,19 +69,19 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
-		000000000000000000000012 /* PathScheduleWidget */ = {
+		000000000000000000000012 /* PathGlanceWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PathScheduleWidget;
+			path = PathGlanceWidget;
 			sourceTree = "<group>";
 		};
-		000000000000000000000013 /* PathScheduleTests */ = {
+		000000000000000000000013 /* PathGlanceTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PathScheduleTests;
+			path = PathGlanceTests;
 			sourceTree = "<group>";
 		};
-		000000000000000000000014 /* PathScheduleUITests */ = {
+		000000000000000000000014 /* PathGlanceUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = PathScheduleUITests;
+			path = PathGlanceUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -114,12 +114,12 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000035 /* docs */,
-				000000000000000000000010 /* PathSchedule */,
-				000000000000000000000012 /* PathScheduleWidget */,
+				000000000000000000000010 /* PathGlance */,
+				000000000000000000000012 /* PathGlanceWidget */,
 				000000000000000000000011 /* Shared */,
 				000000000000000000000030 /* Config */,
-				000000000000000000000014 /* PathScheduleUITests */,
-				000000000000000000000013 /* PathScheduleTests */,
+				000000000000000000000014 /* PathGlanceUITests */,
+				000000000000000000000013 /* PathGlanceTests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -127,10 +127,10 @@
 		000000000000000000000020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000120 /* PathSchedule.app */,
-				000000000000000000000220 /* PathScheduleWidget.appex */,
-				000000000000000000000420 /* PathScheduleUITests.xctest */,
-				000000000000000000000320 /* PathScheduleTests.xctest */,
+				000000000000000000000120 /* PathGlance.app */,
+				000000000000000000000220 /* PathGlanceWidget.appex */,
+				000000000000000000000420 /* PathGlanceUITests.xctest */,
+				000000000000000000000320 /* PathGlanceTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -138,10 +138,10 @@
 		000000000000000000000030 /* Config */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000031 /* PathSchedule.entitlements */,
-				000000000000000000000032 /* PathScheduleWidget.entitlements */,
-				000000000000000000000033 /* PathScheduleWidget-Info.plist */,
-				000000000000000000000034 /* PathSchedule-Info.plist */,
+				000000000000000000000031 /* PathGlance.entitlements */,
+				000000000000000000000032 /* PathGlanceWidget.entitlements */,
+				000000000000000000000033 /* PathGlanceWidget-Info.plist */,
+				000000000000000000000034 /* PathGlance-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -149,9 +149,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		000000000000000100000000 /* PathSchedule */ = {
+		000000000000000100000000 /* PathGlance */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "PathSchedule" */;
+			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "PathGlance" */;
 			buildPhases = (
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
@@ -164,17 +164,17 @@
 				000000000000000160000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				000000000000000000000010 /* PathSchedule */,
+				000000000000000000000010 /* PathGlance */,
 				000000000000000000000011 /* Shared */,
 			);
-			name = PathSchedule;
+			name = PathGlance;
 			productName = MyApp;
-			productReference = 000000000000000000000120 /* PathSchedule.app */;
+			productReference = 000000000000000000000120 /* PathGlance.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000200000000 /* PathScheduleWidget */ = {
+		000000000000000200000000 /* PathGlanceWidget */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000210000000 /* Build configuration list for PBXNativeTarget "PathScheduleWidget" */;
+			buildConfigurationList = 000000000000000210000000 /* Build configuration list for PBXNativeTarget "PathGlanceWidget" */;
 			buildPhases = (
 				000000000000000220000000 /* Sources */,
 				000000000000000230000000 /* Frameworks */,
@@ -184,16 +184,16 @@
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000011 /* Shared */,
-				000000000000000000000012 /* PathScheduleWidget */,
+				000000000000000000000012 /* PathGlanceWidget */,
 			);
-			name = PathScheduleWidget;
-			productName = PathScheduleWidget;
-			productReference = 000000000000000000000220 /* PathScheduleWidget.appex */;
+			name = PathGlanceWidget;
+			productName = PathGlanceWidget;
+			productReference = 000000000000000000000220 /* PathGlanceWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		000000000000000300000000 /* PathScheduleTests */ = {
+		000000000000000300000000 /* PathGlanceTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000310000000 /* Build configuration list for PBXNativeTarget "PathScheduleTests" */;
+			buildConfigurationList = 000000000000000310000000 /* Build configuration list for PBXNativeTarget "PathGlanceTests" */;
 			buildPhases = (
 				000000000000000320000000 /* Sources */,
 				000000000000000330000000 /* Frameworks */,
@@ -205,16 +205,16 @@
 				000000000000000360000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				000000000000000000000013 /* PathScheduleTests */,
+				000000000000000000000013 /* PathGlanceTests */,
 			);
-			name = PathScheduleTests;
-			productName = PathScheduleTests;
-			productReference = 000000000000000000000320 /* PathScheduleTests.xctest */;
+			name = PathGlanceTests;
+			productName = PathGlanceTests;
+			productReference = 000000000000000000000320 /* PathGlanceTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		000000000000000400000000 /* PathScheduleUITests */ = {
+		000000000000000400000000 /* PathGlanceUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000410000000 /* Build configuration list for PBXNativeTarget "PathScheduleUITests" */;
+			buildConfigurationList = 000000000000000410000000 /* Build configuration list for PBXNativeTarget "PathGlanceUITests" */;
 			buildPhases = (
 				000000000000000420000000 /* Sources */,
 				000000000000000430000000 /* Frameworks */,
@@ -226,11 +226,11 @@
 				000000000000000460000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				000000000000000000000014 /* PathScheduleUITests */,
+				000000000000000000000014 /* PathGlanceUITests */,
 			);
-			name = PathScheduleUITests;
-			productName = PathScheduleUITests;
-			productReference = 000000000000000000000420 /* PathScheduleUITests.xctest */;
+			name = PathGlanceUITests;
+			productName = PathGlanceUITests;
+			productReference = 000000000000000000000420 /* PathGlanceUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -259,7 +259,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "PathSchedule" */;
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "PathGlance" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -273,10 +273,10 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				000000000000000100000000 /* PathSchedule */,
-				000000000000000200000000 /* PathScheduleWidget */,
-				000000000000000400000000 /* PathScheduleUITests */,
-				000000000000000300000000 /* PathScheduleTests */,
+				000000000000000100000000 /* PathGlance */,
+				000000000000000200000000 /* PathGlanceWidget */,
+				000000000000000400000000 /* PathGlanceUITests */,
+				000000000000000300000000 /* PathGlanceTests */,
 			);
 		};
 /* End PBXProject section */
@@ -330,23 +330,23 @@
 /* Begin PBXTargetDependency section */
 		000000000000000160000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000200000000 /* PathScheduleWidget */;
+			target = 000000000000000200000000 /* PathGlanceWidget */;
 			targetProxy = 000000000000000161000000 /* PBXContainerItemProxy */;
 		};
 		000000000000000360000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000100000000 /* PathSchedule */;
+			target = 000000000000000100000000 /* PathGlance */;
 			targetProxy = 000000000000000361000000 /* PBXContainerItemProxy */;
 		};
 		000000000000000460000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000100000000 /* PathSchedule */;
+			target = 000000000000000100000000 /* PathGlance */;
 			targetProxy = 000000000000000461000000 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		000000000000000011000000 /* Debug configuration for PBXProject "PathSchedule" */ = {
+		000000000000000011000000 /* Debug configuration for PBXProject "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -416,7 +416,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000012000000 /* Release configuration for PBXProject "PathSchedule" */ = {
+		000000000000000012000000 /* Release configuration for PBXProject "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -478,20 +478,20 @@
 			};
 			name = Release;
 		};
-		000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathSchedule" */ = {
+		000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Config/PathSchedule.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Config/PathGlance.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
+				INFOPLIST_FILE = "Config/PathGlance-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathGlance keeps the lock screen on your nearest PATH station as you travel.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathGlance uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -505,7 +505,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
@@ -519,20 +519,20 @@
 			};
 			name = Debug;
 		};
-		000000000000000112000000 /* Release configuration for PBXNativeTarget "PathSchedule" */ = {
+		000000000000000112000000 /* Release configuration for PBXNativeTarget "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Config/PathSchedule.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Config/PathGlance.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
+				INFOPLIST_FILE = "Config/PathGlance-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathGlance keeps the lock screen on your nearest PATH station as you travel.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathGlance uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -546,7 +546,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
@@ -560,15 +560,15 @@
 			};
 			name = Release;
 		};
-		000000000000000211000000 /* Debug configuration for PBXNativeTarget "PathScheduleWidget" */ = {
+		000000000000000211000000 /* Debug configuration for PBXNativeTarget "PathGlanceWidget" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Config/PathScheduleWidget.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Config/PathGlanceWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/PathScheduleWidget-Info.plist";
+				INFOPLIST_FILE = "Config/PathGlanceWidget-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -576,7 +576,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.Widget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -588,15 +588,15 @@
 			};
 			name = Debug;
 		};
-		000000000000000212000000 /* Release configuration for PBXNativeTarget "PathScheduleWidget" */ = {
+		000000000000000212000000 /* Release configuration for PBXNativeTarget "PathGlanceWidget" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Config/PathScheduleWidget.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Config/PathGlanceWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Config/PathScheduleWidget-Info.plist";
+				INFOPLIST_FILE = "Config/PathGlanceWidget-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -604,7 +604,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.Widget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -616,7 +616,7 @@
 			};
 			name = Release;
 		};
-		000000000000000311000000 /* Debug configuration for PBXNativeTarget "PathScheduleTests" */ = {
+		000000000000000311000000 /* Debug configuration for PBXNativeTarget "PathGlanceTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -625,18 +625,18 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.Tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathSchedule.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PathSchedule";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathGlance.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PathGlance";
 			};
 			name = Debug;
 		};
-		000000000000000312000000 /* Release configuration for PBXNativeTarget "PathScheduleTests" */ = {
+		000000000000000312000000 /* Release configuration for PBXNativeTarget "PathGlanceTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -645,18 +645,18 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.Tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathSchedule.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PathSchedule";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathGlance.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PathGlance";
 			};
 			name = Release;
 		};
-		000000000000000411000000 /* Debug configuration for PBXNativeTarget "PathScheduleUITests" */ = {
+		000000000000000411000000 /* Debug configuration for PBXNativeTarget "PathGlanceUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -664,18 +664,18 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.UITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_TARGET_NAME = PathSchedule;
+				TEST_TARGET_NAME = PathGlance;
 			};
 			name = Debug;
 		};
-		000000000000000412000000 /* Release configuration for PBXNativeTarget "PathScheduleUITests" */ = {
+		000000000000000412000000 /* Release configuration for PBXNativeTarget "PathGlanceUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -683,57 +683,57 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathSchedule.UITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samuelfolledo.PathGlance.UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_TARGET_NAME = PathSchedule;
+				TEST_TARGET_NAME = PathGlance;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		000000000000000010000000 /* Build configuration list for PBXProject "PathSchedule" */ = {
+		000000000000000010000000 /* Build configuration list for PBXProject "PathGlance" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000011000000 /* Debug configuration for PBXProject "PathSchedule" */,
-				000000000000000012000000 /* Release configuration for PBXProject "PathSchedule" */,
+				000000000000000011000000 /* Debug configuration for PBXProject "PathGlance" */,
+				000000000000000012000000 /* Release configuration for PBXProject "PathGlance" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		000000000000000110000000 /* Build configuration list for PBXNativeTarget "PathSchedule" */ = {
+		000000000000000110000000 /* Build configuration list for PBXNativeTarget "PathGlance" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathSchedule" */,
-				000000000000000112000000 /* Release configuration for PBXNativeTarget "PathSchedule" */,
+				000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathGlance" */,
+				000000000000000112000000 /* Release configuration for PBXNativeTarget "PathGlance" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		000000000000000210000000 /* Build configuration list for PBXNativeTarget "PathScheduleWidget" */ = {
+		000000000000000210000000 /* Build configuration list for PBXNativeTarget "PathGlanceWidget" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000211000000 /* Debug configuration for PBXNativeTarget "PathScheduleWidget" */,
-				000000000000000212000000 /* Release configuration for PBXNativeTarget "PathScheduleWidget" */,
+				000000000000000211000000 /* Debug configuration for PBXNativeTarget "PathGlanceWidget" */,
+				000000000000000212000000 /* Release configuration for PBXNativeTarget "PathGlanceWidget" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		000000000000000310000000 /* Build configuration list for PBXNativeTarget "PathScheduleTests" */ = {
+		000000000000000310000000 /* Build configuration list for PBXNativeTarget "PathGlanceTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000311000000 /* Debug configuration for PBXNativeTarget "PathScheduleTests" */,
-				000000000000000312000000 /* Release configuration for PBXNativeTarget "PathScheduleTests" */,
+				000000000000000311000000 /* Debug configuration for PBXNativeTarget "PathGlanceTests" */,
+				000000000000000312000000 /* Release configuration for PBXNativeTarget "PathGlanceTests" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		000000000000000410000000 /* Build configuration list for PBXNativeTarget "PathScheduleUITests" */ = {
+		000000000000000410000000 /* Build configuration list for PBXNativeTarget "PathGlanceUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000411000000 /* Debug configuration for PBXNativeTarget "PathScheduleUITests" */,
-				000000000000000412000000 /* Release configuration for PBXNativeTarget "PathScheduleUITests" */,
+				000000000000000411000000 /* Debug configuration for PBXNativeTarget "PathGlanceUITests" */,
+				000000000000000412000000 /* Release configuration for PBXNativeTarget "PathGlanceUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

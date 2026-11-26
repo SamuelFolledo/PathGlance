@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PathSchedule
+@testable import PathGlance
 
 @Suite("Board rules")
 struct BoardRulesTests {
@@ -194,8 +194,8 @@ struct BoardPlanTests {
 
     // MARK: Alerts
 
-    private func issue(_ kind: IssueKind, lines: [String], ended: Bool = false, detected: Bool = false) -> PathSchedule.Issue {
-        PathSchedule.Issue(id: UUID().uuidString, kind: kind, title: "Test", updates: [], startedAt: now,
+    private func issue(_ kind: IssueKind, lines: [String], ended: Bool = false, detected: Bool = false) -> PathGlance.Issue {
+        PathGlance.Issue(id: UUID().uuidString, kind: kind, title: "Test", updates: [], startedAt: now,
               endedAt: ended ? now : nil, affectedLines: lines, detected: detected)
     }
 

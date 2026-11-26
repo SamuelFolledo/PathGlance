@@ -1,6 +1,6 @@
 # Data
 
-> **Code:** `Shared/` (compiled into the app and the widget): `ScheduleData.swift`, `Board.swift`, `Realtime.swift`, `Issues.swift`, `DayTypes.swift`, `Station.swift`, `SharedStore.swift` · app only: `PathSchedule/Data/WebTimetableImporter.swift`, `TimetableArchive.swift`, `TrainList.swift`, `LocationService.swift`
+> **Code:** `Shared/` (compiled into the app and the widget): `ScheduleData.swift`, `Board.swift`, `Realtime.swift`, `Issues.swift`, `DayTypes.swift`, `Station.swift`, `SharedStore.swift` · app only: `PathGlance/Data/WebTimetableImporter.swift`, `TimetableArchive.swift`, `TrainList.swift`, `LocationService.swift`
 
 ## Summary
 

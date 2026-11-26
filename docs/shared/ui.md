@@ -1,6 +1,6 @@
 # Shared UI
 
-> **Code:** `PathSchedule/DesignSystem/`: `Tokens/Theme.swift`, `UI/Sheet/AppSheet.swift`, `UI/Popover/PopoverMenu.swift`, `UI/Popover/StationMenu.swift`, `UI/Alert/Guide.swift`, `UI/Rows/Rows.swift`
+> **Code:** `PathGlance/DesignSystem/`: `Tokens/Theme.swift`, `UI/Sheet/AppSheet.swift`, `UI/Popover/PopoverMenu.swift`, `UI/Popover/StationMenu.swift`, `UI/Alert/Guide.swift`, `UI/Rows/Rows.swift`
 
 ## Summary
 
@@ -14,7 +14,7 @@
 ## Colour
 
 - **Brand:** `#0095D3` in dark mode, the blue of PATH's logo (read from the logo file on Wikimedia Commons; no official Port Authority spec was found). `#0080B8` in light mode, a little darker so small blue text stays readable on white. (decided 2026-11-23)
-- **Where it is set:** the `AccentColor` asset (`PathSchedule/Assets.xcassets`), named as the target's global accent colour, and `.tint(Theme.Colors.brand)` at the app root (`MyApp`). Use `.tint` where the system tint is meant and `Theme.Colors.brand` where a colour must be named. Never `.blue`. (decided 2026-11-23)
+- **Where it is set:** the `AccentColor` asset (`PathGlance/Assets.xcassets`), named as the target's global accent colour, and `.tint(Theme.Colors.brand)` at the app root (`MyApp`). Use `.tint` where the system tint is meant and `Theme.Colors.brand` where a colour must be named. Never `.blue`. (decided 2026-11-23)
 - **Exception:** a third party's own colour (PayPal's blue in Support the app).
 - The lock screen widget has no colour code; the lock screen draws it in one tone.
 

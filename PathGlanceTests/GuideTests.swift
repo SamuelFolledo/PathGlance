@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PathSchedule
+@testable import PathGlance
 
 /// Guides keep "don't show again" in the app's defaults, so these put back what they found.
 @Suite(.serialized) struct GuideTests {

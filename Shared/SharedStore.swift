@@ -3,7 +3,7 @@ import Foundation
 /// State shared between the app and the widget through the App Group container.
 enum SharedStore {
     /// Must match the App Group in both .entitlements files.
-    static let appGroup = "group.com.samuelfolledo.PathSchedule"
+    static let appGroup = "group.com.samuelfolledo.PathGlance"
     static let widgetKind = "PathBoard"
 
     static var defaults: UserDefaults {

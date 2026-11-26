@@ -1,6 +1,6 @@
 # Issues
 
-> **Where:** second tab · **Code:** `PathSchedule/Features/Issues/IssueViews.swift` · data: `IssueLog`, `IssueKind` (`Shared/Issues.swift`)
+> **Where:** second tab · **Code:** `PathGlance/Features/Issues/IssueViews.swift` · data: `IssueLog`, `IssueKind` (`Shared/Issues.swift`)
 
 ## Summary
 

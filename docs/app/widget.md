@@ -1,6 +1,6 @@
 # Widget and Settings
 
-> **Where:** third tab; Settings is the sheet behind its menu button · **Code:** `WidgetView`, `SettingsSheet` (`PathSchedule/Features/Widget/WidgetView.swift`), `LinesShownRows`, `FavoriteStopsView` (`Sheets/OptionViews.swift`), `WidgetPreviewCard` · widget: `PathScheduleWidget/PathScheduleWidget.swift` · data: `WidgetLook`, `WidgetPreset` (`Shared/WidgetSupport.swift`), `WidgetStyle` (`Shared/Board.swift`)
+> **Where:** third tab; Settings is the sheet behind its menu button · **Code:** `WidgetView`, `SettingsSheet` (`PathGlance/Features/Widget/WidgetView.swift`), `LinesShownRows`, `FavoriteStopsView` (`Sheets/OptionViews.swift`), `WidgetPreviewCard` · widget: `PathGlanceWidget/PathGlanceWidget.swift` · data: `WidgetLook`, `WidgetPreset` (`Shared/WidgetSupport.swift`), `WidgetStyle` (`Shared/Board.swift`)
 
 ## Summary
 

@@ -1,5 +1,5 @@
 import Foundation
-@testable import PathSchedule
+@testable import PathGlance
 
 /// A made-up but realistic PATH timetable, in the shape of the page PATH's website serves,
 /// so tests go through the real importer. Weekdays run every 10 minutes, Saturdays every

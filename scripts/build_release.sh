@@ -24,7 +24,7 @@
 #      the .p8 goes in ~/.appstoreconnect/private_keys/AuthKey_<KEY ID>.p8
 #      and the Issuer ID (shown above the key list) goes in ~/.appstoreconnect/issuer_id
 #
-#   2. The app record must exist in App Store Connect for com.samuelfolledo.PathSchedule.
+#   2. The app record must exist in App Store Connect for com.samuelfolledo.PathGlance.
 #
 #   3. Claude Code CLI on PATH (summarizes commits into release notes).
 #
@@ -42,7 +42,7 @@ DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then DRY_RUN=true; fi
 
 APP_NAME="PathGlance"
-SCHEME="PathSchedule"
+SCHEME="PathGlance"
 TEAM_ID="9NY68F4K3P"
 SITE_SLUG="path-glance"
 
@@ -62,12 +62,12 @@ SSH_KEY="$HOME/.ssh/dreamhost_lt"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECT="$REPO_ROOT/PathSchedule.xcodeproj"
+PROJECT="$REPO_ROOT/PathGlance.xcodeproj"
 PBXPROJ="$PROJECT/project.pbxproj"
 LANDING="$REPO_ROOT/landing"
 RELEASES="$LANDING/releases.json"
 TOOL="$SCRIPT_DIR/release_tool.py"
-WORK_DIR="$(mktemp -d /tmp/pathschedule_release.XXXXXX)"
+WORK_DIR="$(mktemp -d /tmp/pathglance_release.XXXXXX)"
 ARCHIVE="$WORK_DIR/${APP_NAME}.xcarchive"
 
 tool() { python3 "$TOOL" "$@"; }

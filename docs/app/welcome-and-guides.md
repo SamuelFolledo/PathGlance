@@ -1,6 +1,6 @@
 # Welcome note and guides
 
-> **Code:** `Guide`, `GuideView`, `WideButton` (`PathSchedule/DesignSystem/UI/Alert/Guide.swift`) · raised with `AppModel.ask(_:)` · shown in an `AppSheet` popup
+> **Code:** `Guide`, `GuideView`, `WideButton` (`PathGlance/DesignSystem/UI/Alert/Guide.swift`) · raised with `AppModel.ask(_:)` · shown in an `AppSheet` popup
 
 ## Summary
 

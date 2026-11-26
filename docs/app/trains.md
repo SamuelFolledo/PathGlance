@@ -1,6 +1,6 @@
 # Trains
 
-> **Where:** first tab · **Code:** `TrainsView` (`PathSchedule/Features/Trains/TrainsView.swift`), `TrainListPage`, `TrainRows`, `TrainColumn` (`TrainListPage.swift`) · data: `TrainListCache` (`Data/TrainList.swift`), `Board` (`Shared/Board.swift`)
+> **Where:** first tab · **Code:** `TrainsView` (`PathGlance/Features/Trains/TrainsView.swift`), `TrainListPage`, `TrainRows`, `TrainColumn` (`TrainListPage.swift`) · data: `TrainListCache` (`Data/TrainList.swift`), `Board` (`Shared/Board.swift`)
 
 ## Summary
 

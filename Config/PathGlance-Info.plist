@@ -6,7 +6,7 @@
 	<false/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.samuelfolledo.PathSchedule.refresh</string>
+		<string>com.samuelfolledo.PathGlance.refresh</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
@@ -16,10 +16,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.samuelfolledo.PathSchedule</string>
+			<string>com.samuelfolledo.PathGlance</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pathschedule</string>
+				<string>pathglance</string>
 			</array>
 		</dict>
 	</array>

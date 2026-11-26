@@ -56,7 +56,7 @@ struct BoardProvider: TimelineProvider {
         let fontStyle = SharedStore.fontStyle
         let style = SharedStore.widgetStyle
         guard var schedule = SharedStore.loadSchedule(now: now) else {
-            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathSchedule to download the timetable", fontStyle: fontStyle, style: style)
+            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathGlance to download the timetable", fontStyle: fontStyle, style: style)
             return ([entry], now.addingTimeInterval(30 * 60))
         }
 
@@ -151,7 +151,7 @@ struct BoardView: View {
 }
 
 @main
-struct PathScheduleWidget: Widget {
+struct PathGlanceWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: SharedStore.widgetKind, provider: BoardProvider()) { entry in
             BoardView(entry: entry)

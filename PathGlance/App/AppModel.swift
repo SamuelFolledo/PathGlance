@@ -9,7 +9,7 @@ enum AppTab: Hashable {
 
 @MainActor
 final class AppModel: ObservableObject {
-    nonisolated static let refreshTaskID = "com.samuelfolledo.PathSchedule.refresh"
+    nonisolated static let refreshTaskID = "com.samuelfolledo.PathGlance.refresh"
     /// How far the Trains tab reaches either side of today.
     nonisolated static let daysBack = 7
     nonisolated static let daysAhead = 14

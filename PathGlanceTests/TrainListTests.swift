@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PathSchedule
+@testable import PathGlance
 
 @Suite("Train list")
 struct TrainListTests {

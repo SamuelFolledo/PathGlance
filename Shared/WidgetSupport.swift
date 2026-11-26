@@ -209,7 +209,7 @@ struct RefreshBoardIntent: AppIntent {
 
 /// Links from the widget into the app.
 enum AppLink {
-    static let scheme = "pathschedule"
+    static let scheme = "pathglance"
 
     /// Opens the list of trains from `origin` towards `target`.
     static func line(from origin: Station, to target: Station) -> URL {
