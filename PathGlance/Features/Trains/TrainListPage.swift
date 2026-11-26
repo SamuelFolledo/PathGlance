@@ -26,7 +26,7 @@ struct TrainListPage: View {
     /// What the tab's header should show, while this is the list on screen.
     private var header: TrainListHeader? {
         guard isSelected, let list, let day = list.day(containing: topID) else { return nil }
-        return TrainListHeader(title: day.title, isAhead: list.isAhead(top: topID, now: now))
+        return TrainListHeader(title: day.title, isAhead: list.isAhead(top: topID, now: now), day: day.id, note: day.note)
     }
 
     /// What the rows are built from; a change rebuilds them.
@@ -55,15 +55,19 @@ struct TrainListPage: View {
             if let list {
                 // The departure column plus as many arrival columns as fit, always keeping
                 // the destination (the last one).
+                // A hidden destination column is simply not drawn; hidden favorites are
+                // already left out of the list's columns.
+                let hidesTarget = model.hiddenColumns.contains(target)
+                let visible = hidesTarget ? Array(list.columns.dropLast()) : list.columns
                 let fit = max(1, Int((proxy.size.width - 32) / columnWidth) - 1)
-                let skipped = max(0, list.columns.count - fit)
+                let skipped = max(0, visible.count - fit)
 
                 let isAhead = list.isAhead(top: topID, now: now)
                 VStack(spacing: 0) {
-                    columnNames(list.day(containing: topID), columns: Array(list.columns.dropFirst(skipped)))
+                    columnNames(columns: Array(visible.dropFirst(skipped)))
                     // Equatable: scrolling changes `topID` many times a second, and the
                     // rows must not be laid out again for that.
-                    TrainRows(list: list, origin: origin, target: target, skipped: skipped, moves: moves,
+                    TrainRows(list: list, origin: origin, target: target, skipped: skipped, hidesTarget: hidesTarget, moves: moves,
                               showsPeriod: model.showsPeriod, hasHiddenColumns: !model.hiddenColumns.isEmpty, topID: $topID,
                               onSelectTrain: { onSelectTrain($0, list.trains) },
                               onMenu: handle,
@@ -146,25 +150,63 @@ struct TrainListPage: View {
     /// The widest a time gets, for sizing the columns.
     private var sampleTime: String { TrainColumn<Text>.sampleTime(showsPeriod: model.showsPeriod) }
 
-    /// Fixed above the list: any holiday warning, then the column names as plain text.
-    /// The date itself is in the tab's header (`TrainsView`).
-    private func columnNames(_ day: TrainList.Day?, columns: [Station]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let note = day?.note {
-                Label(note, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+    /// Columns hidden with a tap on their name that this list would otherwise show.
+    private var hiddenStops: [Station] {
+        guard !model.hiddenColumns.isEmpty, let schedule = model.schedule else { return [] }
+        return TrainList.columns(schedule: schedule, origin: origin, target: target, favorites: model.favoriteStops)
+            .filter(model.hiddenColumns.contains)
+    }
+
+    /// Fixed above the list: the column names as plain text. Tapping a name hides that
+    /// stop's column; the hidden ones wait in a line above, and a tap brings one back.
+    /// The first column, your own station, always stays. The date is in the tab's header
+    /// (`TrainsView`).
+    private func columnNames(columns: [Station]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            let hidden = hiddenStops
+            if !hidden.isEmpty {
+                HStack(spacing: 6) {
+                    Label("Hidden", systemImage: "eye.slash")
+                    ForEach(hidden) { stop in
+                        Button {
+                            withAnimation(.snappy) { _ = model.hiddenColumns.remove(stop) }
+                        } label: {
+                            Text(stop.shortName)
+                                .strikethrough()
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(Color(.tertiarySystemFill), in: .capsule)
+                                .contentShape(.capsule)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Show the \(stop.name) column")
+                        .accessibilityIdentifier("showColumn-\(stop.rawValue)")
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
             }
             HStack(spacing: 0) {
                 TrainColumn(header: origin.shortName, sample: sampleTime, place: .first) {
                     Text(origin.shortName)
+                        .padding(.vertical, 6)
                 }
                 ForEach(columns) { stop in
                     Spacer(minLength: 4)
                     TrainColumn(header: stop.shortName, sample: sampleTime, place: stop == columns.last ? .last : .middle) {
-                        Text(stop.shortName)
+                        Button {
+                            withAnimation(.snappy) { _ = model.hiddenColumns.insert(stop) }
+                        } label: {
+                            Text(stop.shortName)
+                                .padding(.vertical, 6)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(stop.name)
+                        .accessibilityHint("Hides this column")
+                        .accessibilityIdentifier("column-\(stop.rawValue)")
                     }
-                    .accessibilityLabel(stop.name)
                 }
             }
             .font(.footnote.weight(.semibold))
@@ -173,8 +215,7 @@ struct TrainListPage: View {
             .minimumScaleFactor(0.7)
         }
         .padding(.horizontal, Theme.Spacing.contentSide)
-        .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, 6)
+        .padding(.top, 2)
     }
 }
 
@@ -184,6 +225,10 @@ struct TrainListHeader: Equatable {
     var title: String
     /// Scrolled on past the next train: the station title makes way for the date.
     var isAhead: Bool
+    /// `yyyymmdd` of that day.
+    var day: Int
+    /// A holiday or learned-timetable warning about it, shown as a banner.
+    var note: String?
 }
 
 /// What a train row's long-press menu can ask for.
@@ -203,6 +248,8 @@ private struct TrainRows: View, Equatable {
     let target: Station
     /// Leading columns left out because they do not fit.
     let skipped: Int
+    /// The destination's column was hidden with a tap on its name.
+    let hidesTarget: Bool
     /// Changes when the list was moved in code, which must reach the scroll view.
     let moves: Int
     /// AM and PM after each time.
@@ -215,7 +262,7 @@ private struct TrainRows: View, Equatable {
     let onRefresh: () async -> Void
 
     static func == (lhs: TrainRows, rhs: TrainRows) -> Bool {
-        lhs.list.version == rhs.list.version && lhs.skipped == rhs.skipped && lhs.moves == rhs.moves
+        lhs.list.version == rhs.list.version && lhs.skipped == rhs.skipped && lhs.hidesTarget == rhs.hidesTarget && lhs.moves == rhs.moves
             && lhs.showsPeriod == rhs.showsPeriod && lhs.hasHiddenColumns == rhs.hasHiddenColumns
             && lhs.origin == rhs.origin && lhs.target == rhs.target
     }
@@ -282,22 +329,16 @@ private struct TrainRows: View, Equatable {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("From here, trains run \(name)")
         case .train(let train, let allCells):
-            let cells = Array(allCells.dropFirst(skipped))
+            let cells = Array((hidesTarget ? Array(allCells.dropLast()) : allCells).dropFirst(skipped))
             let delay = TimeInterval(train.isLate ? train.delayMinutes * 60 : 0)
             Button {
                 onSelectTrain(train)
             } label: {
-                let stops = Array(list.columns.dropFirst(skipped))
+                let stops = Array((hidesTarget ? Array(list.columns.dropLast()) : list.columns).dropFirst(skipped))
                 let sample = TrainColumn<Text>.sampleTime(showsPeriod: showsPeriod)
                 HStack(alignment: .top, spacing: 0) {
                     TrainColumn(header: origin.shortName, sample: sample, place: .first) {
-                        HStack(alignment: .firstTextBaseline, spacing: TrainColumnMetrics.dotSpacing) {
-                            TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
-                            if train.isLive {
-                                // Green: a live time, on schedule. Yellow: a live time, running late.
-                                StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
-                            }
-                        }
+                        TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
                     }
                     ForEach(Array(cells.enumerated()), id: \.offset) { index, arrival in
                         // The last column is pushed to the right edge.
@@ -319,6 +360,15 @@ private struct TrainRows: View, Equatable {
                 .minimumScaleFactor(0.7)
                 .padding(.horizontal, Theme.Spacing.contentSide)
                 .padding(.vertical, 10)
+                // The live dot sits in the margin, level with the middle of the row, so
+                // the times line up with the rows that have none.
+                .overlay(alignment: .leading) {
+                    if train.isLive {
+                        // Green: a live time, on schedule. Yellow: a live time, running late.
+                        StatusDot(color: train.isLate ? .yellow : .green, label: train.isLate ? "Live, running late" : "Live")
+                            .padding(.leading, (Theme.Spacing.contentSide - Theme.Size.dot) / 2)
+                    }
+                }
                 .contentShape(.rect)
                 // A train that has gone is still there to look at, a little greyed.
                 .opacity(row.isPast ? 0.45 : 1)
@@ -432,10 +482,6 @@ struct TrainTimeText: View {
     }
 }
 
-enum TrainColumnMetrics {
-    static let dotSpacing: CGFloat = 5
-}
-
 /// One column of the train list, in the header and in every row. Each is exactly as wide
 /// as the widest thing it can hold, so the header and the rows line up, and the space left
 /// over is shared equally between the columns however many there are.
@@ -463,14 +509,9 @@ struct TrainColumn<Content: View>: View {
             Group {
                 Text(header)
                     .font(.footnote.weight(.semibold))
-                HStack(spacing: TrainColumnMetrics.dotSpacing) {
-                    Text(sample)
-                        .font(place == .first ? .body.weight(.semibold) : .callout)
-                        .monospacedDigit()
-                    if place == .first {
-                        Color.clear.frame(width: Theme.Size.dot, height: 1)
-                    }
-                }
+                Text(sample)
+                    .font(place == .first ? .body.weight(.semibold) : .callout)
+                    .monospacedDigit()
             }
             .lineLimit(1)
             .hidden()

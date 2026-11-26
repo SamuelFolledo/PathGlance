@@ -18,6 +18,7 @@ enum Theme {
     enum Radius {
         static let card: CGFloat = 22
         static let sheet: CGFloat = 28
+        static let banner: CGFloat = 14
     }
 
     enum Size {

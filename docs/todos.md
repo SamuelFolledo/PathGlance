@@ -27,7 +27,7 @@ Open work, in one list. No tickets, no board.
 	- G5 chosen and added; the widget extension has no icon of its own (2026-11-26)
 - [ ] Dark and tinted variants of the app icon (2026-11-26)
 - [ ] Decide on the Issues tab ideas IA to IF and the Widget tab ideas WA to WF (2026-11-23)
-	- Issues round two drawn (IG to IN, detail sheets DA and DB). DA chosen as the detail sheet and IN liked for the Trains tab; neither is built. The list layout is still open (2026-11-25)
+	- Issues round two drawn (IG to IN, detail sheets DA and DB). DA chosen as the detail sheet and IN liked for the Trains tab (2026-11-25); both built 2026-11-26. The list layout is still open
 	- Widget tab: drawings asked for underline tabs switching the preview between half and full width, and for a small one-slot widget; not decided (2026-11-25)
 
 ## After the look is final
@@ -56,6 +56,10 @@ Open work, in one list. No tickets, no board.
 
 - [ ] `testDateJumpAndBackToNow` is flaky; find out why (2026-11-23)
 - [ ] `testTrainOpensItsStopsAndStepsToTheNext` fails now and then on a row that is off screen ("No matches found" / "Failed to determine hittability"); it passes when run alone (2026-11-23)
+
+## Last, after the session
+
+- [ ] Rename the local folder `Desktop/StreamCodes/PathSchedule` to `PathGlance`, and move Claude's memory folder for the project with it (it is keyed to the folder's path) (2026-11-26)
 
 ## App, older open items
 

@@ -34,11 +34,25 @@ Centered, at every text size, on two lines if it needs them. Tap it for the stat
 One tab per destination the station has trains to (`BoardRules` in `Shared/Board.swift`; the table is in the repo README). A destination hidden under Widget > Lines shown has no tab. (decided 2026-11-23)
 
 - **Look:** plain text on a hairline, the selected tab underlined in the brand colour (`UnderlineTabs` in `DesignSystem/UI/Tabs`). Not a segmented control and not pills. (decided 2026-11-25)
-- **Next train:** under each name, always stacked, scrolled or not: "Now", "4 min", or the clock time once it is an hour or more away; "No trains" when there is none (`TrainList.waitText`). On the selected tab it is green, or yellow when that train is running late. It uses the live feed where there is one and is worked out again every minute. (decided 2026-11-25)
+- **Next train:** under each name, always stacked, scrolled or not: "Now", "4 min", or the clock time once it is an hour or more away; "No trains" when there is none (`TrainList.waitText`). It is green, or yellow when that train is running late, on every tab; an unselected tab keeps the hue, only quieter. It uses the live feed where there is one and is worked out again every minute. (decided 2026-11-25; colour kept on unselected tabs 2026-11-26)
+- **Type:** the name is body size and bold, the wait under it is smaller and not bold. Set in `UnderlineTabs`, so every use of the tabs matches. (decided 2026-11-26)
+
+### Banners
+
+Under the tabs, above the column names: one strip per thing worth knowing before you read the times (`IssueBannerStack` in `DesignSystem/UI/Banner`, design IN). (decided 2026-11-26)
+
+- **What shows:** open issues whose kind is not muted and whose text names this station or a line from it to the destination on screen (`IssueMatcher` in `Data/IssueMatch.swift`), the station's own first; then the holiday-timetable note for the day on screen. An issue whose text names neither stays on the Issues tab only.
+- **One at a time:** each banner is the full width, with no peek of the next. Swipe sideways for the next or back; dots under them say how many there are.
+- **Each banner:** icon, title, PATH's latest words, when they came, and an X.
+- **X:** puts that banner away until tomorrow (`AppModel.dismissBanner`), here and in the stops sheet. Restore defaults brings them back.
+- **Tap:** opens the issue's sheet (see [Issues](issues.md)); the holiday note opens a short explanation.
+- The same banners, less the holiday note, sit at the top of a train's stops sheet.
 
 ### Column names
 
-Plain text above the list card, no pill and no panel; a holiday warning sits above them when the day has one (`TrainListPage`). When scrolled on, the rows fade out under them. (decided 2026-11-25)
+Plain text above the list card, no pill and no panel (`TrainListPage`). When scrolled on, the rows fade out under them. (decided 2026-11-25) The holiday warning that sat above them is now a banner. (2026-11-26)
+
+- **Tap a name** to hide that stop's column. Hidden names wait in a "Hidden" line above, struck through; tap one to bring its column back. Your own station, the first column, cannot be hidden. The choice is remembered (`hiddenColumns`) and Restore defaults clears it. (decided 2026-11-26)
 
 - **Columns:** your station, each favorite stop on the way, then the destination. Each column is exactly as wide as the widest time it can hold, and the space left over is shared equally between the columns however many there are (`TrainColumn`). Leading columns that do not fit are left out, which is what happens at large text. (decided 2026-11-23)
 
@@ -47,7 +61,7 @@ Plain text above the list card, no pill and no panel; a holiday warning sits abo
 One row per train (`TrainRows`), one section per day; the line where a day ends is in the brand colour for today.
 
 - **First column** is heavier than the arrival columns; the last column sits against the right edge.
-- **Live:** the next train or two per line come from PATH's feed and carry a dot. When a train is late, the timetable time is struck through and the live time sits under it in yellow (`TrainTimeText`). See [data](../shared/data.md).
+- **Live:** the next train or two per line come from PATH's feed and carry a dot. The dot sits in the row's left margin, level with the middle of the row, so every time lines up with the rows that have none. (dot moved left 2026-11-26) When a train is late, the timetable time is struck through and the live time sits under it in yellow (`TrainTimeText`). See [data](../shared/data.md).
 - **Tap:** opens the train's stops in a sheet. The arrows, or a sideways swipe, step to the train before or after.
 - **Press and hold** (`TrainRowAction`): show every stop; hide a column; remove a favorite stop; show hidden columns; show or hide AM/PM; edit favorite stops; report this train's time by email.
 - **Back to now:** once scrolled well away from the present, a way back is offered.

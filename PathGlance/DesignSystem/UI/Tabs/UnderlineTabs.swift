@@ -6,7 +6,7 @@ struct UnderlineTab<ID: Hashable>: Identifiable {
     var title: String
     /// Stacked under the title, never beside it.
     var detail: String?
-    /// The detail's colour while the tab is selected. Unselected tabs are all grey.
+    /// The detail's colour. It keeps its hue on an unselected tab, only quieter.
     var detailColor: Color = .secondary
     /// What VoiceOver says for the title.
     var spokenTitle: String
@@ -30,13 +30,15 @@ struct UnderlineTabs<ID: Hashable>: View {
                 } label: {
                     VStack(spacing: 1) {
                         Text(tab.title)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.body.weight(.bold))
                             .foregroundStyle(isSelected ? .primary : .secondary)
                         if let detail = tab.detail {
                             Text(detail)
-                                .font(.caption.weight(.medium))
+                                .font(.footnote)
                                 .monospacedDigit()
-                                .foregroundStyle(isSelected ? tab.detailColor : .secondary)
+                                .foregroundStyle(tab.detailColor)
+                                .saturation(isSelected ? 1 : 0.6)
+                                .opacity(isSelected ? 1 : 0.6)
                                 .contentTransition(.numericText())
                         }
                     }

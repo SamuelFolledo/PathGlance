@@ -25,12 +25,18 @@ struct TrainsView: View {
         case favorites
         /// One train's stops, with the day's other trains to step through.
         case stops(TrainTime, target: Station, trains: [TrainTime])
+        /// An issue opened from a banner, with why it was shown.
+        case issue(Issue, IssueRelevance?)
+        /// A banner that is not an issue: the holiday timetable note.
+        case note(IssueBannerItem)
 
         /// One id per kind: stepping to the next train changes the sheet's content in place.
         var id: String {
             switch self {
             case .favorites: return "favorites"
             case .stops: return "stops"
+            case .issue: return "issue"
+            case .note: return "note"
             }
         }
     }
@@ -99,16 +105,30 @@ struct TrainsView: View {
             }
         }
         .animation(.snappy, value: isAway)
-        .appSheet(item: $sheet, title: sheetTitle, subtitle: sheetSubtitle) { sheet in
+        .appSheet(item: $sheet, title: sheetTitle, subtitle: sheetSubtitle, accessory: sheetAccessory) { sheet in
             switch sheet {
             case .favorites:
                 FavoriteStopsView()
             case .stops(let train, let target, let trains):
                 if let schedule = model.schedule {
-                    StopsView(schedule: schedule, origin: origin, target: target, train: train, trains: trains, now: now) { other in
+                    StopsView(schedule: schedule, origin: origin, target: target, train: train, trains: trains, now: now,
+                              banners: issueBanners(target: target),
+                              onOpenBanner: open,
+                              onDismissBanner: { model.dismissBanner($0.id, now: now) }) { other in
                         self.sheet = .stops(other, target: target, trains: trains)
                     }
                 }
+            case .issue(let issue, let relevance):
+                IssueDetailView(issue: issue, relevance: relevance)
+            case .note(let item):
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    Text(item.subtitle.isEmpty ? item.title : "\(item.title): \(item.subtitle)")
+                        .font(.body.weight(.semibold))
+                    Text("PATH runs a different timetable on some holidays and does not always publish which. The app works it out from the live trains on the day and remembers it for next year.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .appSheet(item: $datePicker, style: .popup, title: { _ in "Go to date" }) { _ in
@@ -148,13 +168,55 @@ struct TrainsView: View {
         switch sheet {
         case .favorites: return "Favorite stops"
         case .stops(let train, let target, _): return "\(PathFormat.relativeDay(train.time, now: now)) · \(origin.shortName) to \(target.shortName)"
+        case .issue(let issue, _): return issue.title
+        case .note: return "Holiday timetable"
+        }
+    }
+
+    private func sheetAccessory(_ sheet: Sheet) -> AnyView? {
+        if case .issue(let issue, _) = sheet { return AnyView(MuteButton(kind: issue.kind)) }
+        return nil
+    }
+
+    // MARK: Banners
+
+    /// Open issues that name this station or the line to `target`, less the ones put
+    /// away today.
+    private func issueBanners(target: Station?) -> [IssueBannerItem] {
+        model.relevantIssues(station: origin, target: target)
+            .filter { !model.isBannerDismissed($0.issue.id, now: now) }
+            .map { $0.issue.banner(now: now) }
+    }
+
+    /// The issues, then the holiday note for the day on screen.
+    private func banners(target: Station?) -> [IssueBannerItem] {
+        var items = issueBanners(target: target)
+        if let note = shown.note {
+            let parts = note.split(separator: ": ", maxSplits: 1).map(String.init)
+            let item = IssueBannerItem(id: "daynote-\(shown.day)", symbol: "calendar.badge.exclamationmark", color: .orange,
+                                       title: parts.first ?? note, subtitle: parts.count > 1 ? parts[1].prefix(1).uppercased() + parts[1].dropFirst() : "", time: "")
+            if !model.isBannerDismissed(item.id, now: now) { items.append(item) }
+        }
+        return items
+    }
+
+    /// A banner was tapped: its issue's details, or the note's.
+    private func open(_ item: IssueBannerItem) {
+        if let found = model.relevantIssues(station: origin, target: nil).first(where: { $0.issue.id == item.id })
+            ?? model.relevantIssues(station: origin, target: model.browseTarget).first(where: { $0.issue.id == item.id }) {
+            sheet = .issue(found.issue, found.relevance)
+        } else if let issue = (model.issues.active + model.sampleIssues).first(where: { $0.id == item.id }) {
+            sheet = .issue(issue, .line)
+        } else {
+            sheet = .note(item)
         }
     }
 
     private func sheetSubtitle(_ sheet: Sheet) -> String? {
         switch sheet {
         case .favorites: return "Each checked stop gets a column of arrival times in the train list."
-        case .stops: return nil
+        case .stops, .note: return nil
+        case .issue: return "Every update PATH sent about this."
         }
     }
 
@@ -188,7 +250,7 @@ struct TrainsView: View {
 
     /// The header's state: what the list on screen reports, or today until it has loaded.
     private var shown: TrainListHeader {
-        header ?? TrainListHeader(title: TrainList.dayTitle(model.listAnchor, now: now), isAhead: false)
+        header ?? TrainListHeader(title: TrainList.dayTitle(model.listAnchor, now: now), isAhead: false, day: PathTime.ymd(of: model.listAnchor))
     }
 
     // MARK: Pieces
@@ -254,7 +316,7 @@ struct TrainsView: View {
         let next = nextTrains[station]
         return UnderlineTab(id: station, title: station.lineLabel,
                             detail: next.map { TrainList.waitText(until: $0.time, now: now) } ?? "No trains",
-                            detailColor: next?.isLate == true ? .yellow : .green,
+                            detailColor: next == nil ? .secondary : (next?.isLate == true ? .yellow : .green),
                             spokenTitle: station.name)
     }
 
@@ -271,6 +333,12 @@ struct TrainsView: View {
             .padding(.horizontal, Theme.Spacing.contentSide)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("destinationPicker")
+
+            IssueBannerStack(items: banners(target: current), onOpen: open) { item in
+                model.dismissBanner(item.id, now: now)
+            }
+            .padding(.horizontal, Theme.Spacing.contentSide)
+            .padding(.top, Theme.Spacing.sm)
 
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
@@ -346,6 +414,10 @@ struct StopsView: View {
     /// The list this train came from, in order.
     let trains: [TrainTime]
     let now: Date
+    /// Issues on this station or line, shown above the stops.
+    var banners: [IssueBannerItem] = []
+    var onOpenBanner: (IssueBannerItem) -> Void = { _ in }
+    var onDismissBanner: (IssueBannerItem) -> Void = { _ in }
     let show: (TrainTime) -> Void
 
     @EnvironmentObject private var model: AppModel
@@ -368,6 +440,7 @@ struct StopsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            IssueBannerStack(items: banners, onOpen: onOpenBanner, onDismiss: onDismissBanner)
             // Between the arrows: the one thing that changes from train to train.
             HStack {
                 RoundButton(symbol: "chevron.left", label: "Earlier train", identifier: "earlierTrain") { step(-1) }

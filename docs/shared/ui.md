@@ -65,6 +65,12 @@ All in `UI/Rows/Rows.swift`.
 - `TabTitle` and `.pinnedBarTop { }`: a tab's small centered title, pinned with no background.
 - `RoundButton`, `StationBadge`, `StatusDot`.
 
+Elsewhere in `UI/`:
+
+- `UnderlineTabs` (`Tabs`): plain-text tabs on a hairline; the name bold at body size, an optional smaller line under it that keeps its colour when unselected. (2026-11-26)
+- `IssueBanner`, `IssueBannerStack` (`Banner`): a tinted strip with icon, title, a line under it, a time and an X; the stack pages sideways one full width at a time with dots under it. It knows nothing about issues: the screen hands it `IssueBannerItem`s. (2026-11-26)
+- `Tag`, `TagFlow` (`Tags`): small rounded labels that wrap onto new rows. (2026-11-26)
+
 Rules:
 
 - **The whole row is the button**, not only its label or its mark. (decided 2026-11-23)

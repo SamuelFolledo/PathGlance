@@ -10,7 +10,6 @@ Things that might be worth doing and that nobody has agreed to yet. Nothing here
 
 - Delay history log: how often and how long each line has been late (2026-11-23)
 - Red "skipped" dots for a train the live feed dropped (2026-11-23)
-- A strip on the Trains tab when the line being viewed has an issue, with late trains marked yellow and a dot on the Issues tab (drawing IN; liked 2026-11-25, not yet a TODO)
 
 ## Issues
 

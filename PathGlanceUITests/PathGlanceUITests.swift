@@ -134,9 +134,69 @@ final class PathGlanceUITests: XCTestCase {
         XCTAssertTrue(last.exists && last.frame.maxY <= tabBarTop, "The sheet's content scrolls until its end is above the tab bar")
         shot("02b-favorites-scrolled")
         app.buttons["Close"].tap()
-        XCTAssertTrue(app.staticTexts["Newport"].waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
+        let column = app.buttons["column-newport"]
+        XCTAssertTrue(column.waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'")).firstMatch.waitForExistence(timeout: 10), "The list comes back with the new column")
         shot("03-columns")
+
+        // Tapping a column's name hides it; it waits above the names until tapped again.
+        column.tap()
+        let hidden = app.buttons["showColumn-newport"]
+        XCTAssertTrue(hidden.waitForExistence(timeout: 5), "A hidden column stays in reach")
+        XCTAssertTrue(column.waitForNonExistence(timeout: 5))
+        shot("03b-column-hidden")
+        hidden.tap()
+        XCTAssertTrue(column.waitForExistence(timeout: 5), "Tapping it brings the column back")
+    }
+
+    func testIssueBannersPageOpenAndDismiss() {
+        // Two made-up issues, and nothing put away from an earlier run.
+        launch(extra: ["-sampleBanners", "YES", "-dismissedBanners", "<dict></dict>"])
+        XCTAssertTrue(picker.waitForExistence(timeout: 30))
+        let banner = app.buttons["issueBanner"].firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 10), "An issue on this line shows above the trains")
+        let dots = app.descendants(matching: .any)["issueBannerDots"].firstMatch
+        XCTAssertTrue(dots.exists, "More than one notice: the dots say so")
+        XCTAssertTrue(dots.label.hasPrefix("Notice 1 of"), "label is \(dots.label)")
+        shot("21-banner")
+
+        // Sideways for the next one, and back.
+        // Fixed points on the screen: the first banner itself moves away with the swipe.
+        let frame = banner.frame
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let right = origin.withOffset(CGVector(dx: frame.minX + frame.width * 0.8, dy: frame.midY))
+        let left = origin.withOffset(CGVector(dx: frame.minX + frame.width * 0.1, dy: frame.midY))
+        right.press(forDuration: 0.05, thenDragTo: left, withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertTrue(dots.waitForLabel(prefix: "Notice 2 of"), "label is \(dots.label)")
+        shot("22-banner-second")
+        left.press(forDuration: 0.05, thenDragTo: right, withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertTrue(dots.waitForLabel(prefix: "Notice 1 of"), "label is \(dots.label)")
+
+        // A tap opens the issue with its updates on a rail.
+        app.buttons["issueBanner"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["sortUpdates"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["muteRow"].exists)
+        shot("23-issue-detail")
+        app.buttons["Close"].firstMatch.tap()
+        _ = app.buttons["sortUpdates"].waitForNonExistence(timeout: 3)
+
+        // The X puts one away for the day.
+        let before = app.buttons.matching(identifier: "issueBannerDismiss").count
+        app.buttons["issueBannerDismiss"].firstMatch.tap()
+        let fewer = NSPredicate { _, _ in self.app.buttons.matching(identifier: "issueBannerDismiss").count == before - 1 }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: fewer, object: nil)], timeout: 5), .completed)
+        shot("24-banner-dismissed")
+
+        // The stops sheet carries the same notices.
+        let trains = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'"))
+        XCTAssertTrue(trains.firstMatch.waitForExistence(timeout: 10))
+        let onScreen = trains.allElementsBoundByIndex.filter { $0.frame.minY > 400 && $0.frame.maxY < 700 }.filter(\.isHittable)
+        XCTAssertFalse(onScreen.isEmpty)
+        onScreen[0].tap()
+        XCTAssertTrue(app.buttons["laterTrain"].waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(app.buttons.matching(identifier: "issueBanner").count, 0)
+        shot("25-stops-banner")
+        app.buttons["Close"].firstMatch.tap()
     }
 
     func testTrainOpensItsStopsAndStepsToTheNext() {
@@ -426,6 +486,11 @@ final class PathGlanceUITests: XCTestCase {
 private extension XCUIElement {
     func waitForSelected(timeout: TimeInterval = 5) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: self)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    func waitForLabel(prefix: String, timeout: TimeInterval = 5) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", prefix), object: self)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 

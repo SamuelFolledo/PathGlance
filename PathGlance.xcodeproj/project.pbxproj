@@ -47,11 +47,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		000000000000000000000035 /* docs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = docs; sourceTree = "<group>"; };
 		000000000000000000000031 /* PathGlance.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathGlance.entitlements; sourceTree = "<group>"; };
 		000000000000000000000032 /* PathGlanceWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathGlanceWidget.entitlements; sourceTree = "<group>"; };
 		000000000000000000000033 /* PathGlanceWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathGlanceWidget-Info.plist"; sourceTree = "<group>"; };
 		000000000000000000000034 /* PathGlance-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathGlance-Info.plist"; sourceTree = "<group>"; };
+		000000000000000000000035 /* docs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = docs; sourceTree = "<group>"; };
 		000000000000000000000120 /* PathGlance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathGlance.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000220 /* PathGlanceWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathGlanceWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000320 /* PathGlanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathGlanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -481,6 +481,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/PathGlance.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -522,6 +523,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "PathGlance" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/PathGlance.entitlements;
 				CODE_SIGN_STYLE = Automatic;

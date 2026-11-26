@@ -109,36 +109,128 @@ struct IssueRow: View {
     }
 }
 
-/// One issue's facts and every update PATH sent about it, newest first.
+extension PathLines {
+    /// The colours PATH's map gives its lines.
+    static func color(_ code: String) -> Color {
+        switch code {
+        case "NWK-WTC": return .red
+        case "JSQ-33": return .orange
+        case "HOB-33": return Theme.Colors.brand
+        case "HOB-WTC": return .green
+        default: return .gray
+        }
+    }
+}
+
+extension Issue {
+    /// When PATH last said something about it: the time today, else the day too.
+    func latestTime(now: Date) -> String {
+        let date = updates.last?.date ?? startedAt
+        return PathTime.ymd(of: date) == PathTime.ymd(of: now) ? CompactTimes.clockWithPeriod(date) : PathFormat.dayTime(date)
+    }
+
+    /// The issue as a banner: its title, PATH's latest words, and when they came.
+    func banner(now: Date) -> IssueBannerItem {
+        IssueBannerItem(id: id, symbol: kind.symbolName, color: kind.color, title: title,
+                        subtitle: latestMessage.isEmpty ? (updates.last?.subject ?? "") : latestMessage,
+                        time: latestTime(now: now))
+    }
+
+    /// Two made-up issues, for screenshots and UI tests.
+    static func samples(now: Date) -> [Issue] {
+        func update(_ id: Int, _ minutesAgo: Double, _ subject: String, _ message: String) -> IssueUpdate {
+            IssueUpdate(id: id, date: now.addingTimeInterval(-minutesAgo * 60), subject: subject, message: message)
+        }
+        return [
+            Issue(id: "sample-signal", kind: .delay, title: "Signal Problem",
+                  updates: [update(1, 42, "PATHAlert: Signal Problem", "JSQ-33 delayed. Dispatch has reported a signal problem at Grove St."),
+                            update(2, 30, "PATHAlert Update: Signal Problem", "JSQ-33 delayed up to 15 min. Maintenance dispatched."),
+                            update(3, 17, "PATHAlert Update: Signal Problem", "JSQ-33 delayed up to 15 min. Crews on site, trains holding at Newport.")],
+                  startedAt: now.addingTimeInterval(-42 * 60), affectedLines: ["JSQ-33"]),
+            Issue(id: "sample-track", kind: .other, title: "Track Change",
+                  updates: [update(4, 95, "PATHAlert: Track Change", "NWK-WTC trains are leaving from Harrison track H.")],
+                  startedAt: now.addingTimeInterval(-95 * 60)),
+        ]
+    }
+}
+
+extension AppModel {
+    /// Mutes or unmutes a kind of issue. Muting is explained first, since it hides things.
+    /// Unmuting just happens, except for elevator notices, which start muted for a reason.
+    func toggleMute(_ kind: IssueKind) {
+        if mutedKinds.contains(kind) {
+            guard kind == .elevator else {
+                setMuted(kind, false)
+                return
+            }
+            ask(Guide(
+                id: "unmute-elevator",
+                title: "Unmute elevator and escalator notices?",
+                points: [
+                    "PATH posts these often, and several are usually open at once.",
+                    "Each will count on the Issues badge and put the alert mark on the lock screen widget.",
+                ],
+                confirm: "Unmute"
+            ) { self.setMuted(kind, false) })
+            return
+        }
+        ask(Guide(
+            id: "mute-issues",
+            title: "Mute \(kind.pluralTitle.lowercased())?",
+            points: [
+                "Issues of this kind will still be listed in the Issues tab.",
+                "They will no longer count on the Issues badge.",
+                "They will no longer show on the lock screen widget." + (kind == .delay ? " That includes the ? and ! delay marks." : ""),
+                "Unmute here or in Settings, under Muted issues.",
+            ],
+            confirm: "Mute"
+        ) { self.setMuted(kind, true) })
+    }
+}
+
+/// One issue: why you are seeing it, then every update PATH sent about it on a time
+/// rail, newest first, then a way to mute its kind.
 struct IssueDetailView: View {
     let issue: Issue
+    /// Set when it was opened from somewhere that knows why it matters to the user.
+    var relevance: IssueRelevance?
 
+    @EnvironmentObject private var model: AppModel
     /// Newest update first, or the order they were sent.
     @State private var newestFirst = true
     @State private var showsSort = false
 
+    private var isMuted: Bool { model.mutedKinds.contains(issue.kind) }
+
+    private var lines: [String] {
+        (issue.affectedLines.isEmpty ? Array(IssueMatcher.place(of: issue).lines) : issue.affectedLines).sorted()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(issue.kind.title, systemImage: issue.kind.symbolName)
-                .foregroundStyle(issue.kind.color)
-                .font(.subheadline.weight(.semibold))
-            LabeledContent("Started", value: PathFormat.dayTime(issue.startedAt))
-            if let ended = issue.endedAt {
-                LabeledContent("Ended", value: PathFormat.dayTime(ended))
-            } else {
-                LabeledContent("Status", value: "Ongoing")
-            }
-            if !issue.affectedLines.isEmpty {
-                LabeledContent("Lines affected", value: issue.affectedLines.joined(separator: ", "))
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            TagFlow {
+                switch relevance {
+                case .station: Tag(text: "Your station", color: Theme.Colors.brand, isStrong: true)
+                case .line: Tag(text: "Your line", color: Theme.Colors.brand, isStrong: true)
+                case nil: EmptyView()
+                }
+                Tag(text: issue.kind.title, color: issue.kind.color, symbol: issue.kind.symbolName)
+                ForEach(lines, id: \.self) { code in
+                    Tag(text: code, color: .secondary, dot: PathLines.color(code))
+                }
+                if let ended = issue.endedAt {
+                    Tag(text: "Ended \(PathFormat.dayTime(ended))", color: .secondary)
+                } else {
+                    Tag(text: "Still open", color: .orange, isStrong: true)
+                }
             }
             if issue.detected {
                 Text("Noticed by the app from live arrival times, not announced by PATH.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            Divider()
             HStack {
-                Text("Updates")
+                Text(issue.updates.count == 1 ? "1 update" : "\(issue.updates.count) updates")
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
@@ -158,18 +250,72 @@ struct IssueDetailView: View {
                     }
                 }
             }
-            ForEach(newestFirst ? issue.updates.reversed() : issue.updates) { update in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(PathFormat.dayTime(update.date))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text(update.message.isEmpty ? update.subject : update.message)
-                        .font(.subheadline)
+            let updates = newestFirst ? Array(issue.updates.reversed()) : issue.updates
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(updates.enumerated()), id: \.element.id) { index, update in
+                    // The newest update is the filled dot, wherever the sort puts it.
+                    RailRow(update: update, isNewest: update.id == issue.updates.last?.id && issue.isActive,
+                            isFirst: index == 0, isLast: index == updates.count - 1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
             }
+            .accessibilityIdentifier("issueUpdates")
+            WideButton(title: isMuted ? "Unmute \(issue.kind.pluralTitle.lowercased())" : "Mute alerts like this",
+                       symbol: isMuted ? "bell.fill" : "bell.slash.fill", identifier: "muteRow") {
+                model.toggleMute(issue.kind)
+            }
+            .padding(.top, Theme.Spacing.xs)
         }
+    }
+}
+
+/// One update on the time rail: when, a dot on the line, and what PATH said.
+private struct RailRow: View {
+    let update: IssueUpdate
+    let isNewest: Bool
+    let isFirst: Bool
+    let isLast: Bool
+
+    @ScaledMetric(relativeTo: .footnote) private var timeWidth: CGFloat = 66
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(CompactTimes.clockWithPeriod(update.date))
+                    .monospacedDigit()
+                Text(PathFormat.relativeDay(update.date, now: Date()))
+                    .font(.caption2)
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: timeWidth, alignment: .trailing)
+
+            Text(update.message.isEmpty ? update.subject : update.message)
+                .font(.subheadline)
+                .fontWeight(isNewest ? .semibold : .regular)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, Theme.Spacing.md + 12)
+                .padding(.bottom, isLast ? 0 : Theme.Spacing.lg)
+                // The rail: a line the height of this update with its dot at the top.
+                .overlay(alignment: .topLeading) {
+                    ZStack(alignment: .top) {
+                        Rectangle()
+                            .fill(.quaternary)
+                            .frame(width: 2)
+                            .padding(.top, isFirst ? 6 : 0)
+                            .opacity(isFirst && isLast ? 0 : 1)
+                        Circle()
+                            .fill(isNewest ? AnyShapeStyle(Theme.Colors.brand) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                            .overlay { Circle().strokeBorder(isNewest ? AnyShapeStyle(Theme.Colors.brand) : AnyShapeStyle(.secondary), lineWidth: 2) }
+                            .frame(width: 12, height: 12)
+                            .padding(.top, 3)
+                    }
+                    .frame(width: 12)
+                    .frame(maxHeight: isLast ? 18 : .infinity, alignment: .top)
+                }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -182,42 +328,10 @@ struct MuteButton: View {
 
     private var isMuted: Bool { model.mutedKinds.contains(kind) }
 
-    /// Muting is explained first, since it hides things. Unmuting just happens, except
-    /// for elevator notices, which start muted for a reason.
-    private func toggle() {
-        if isMuted {
-            guard kind == .elevator else {
-                model.setMuted(kind, false)
-                return
-            }
-            model.ask(Guide(
-                id: "unmute-elevator",
-                title: "Unmute elevator and escalator notices?",
-                points: [
-                    "PATH posts these often, and several are usually open at once.",
-                    "Each will count on the Issues badge and put the alert mark on the lock screen widget.",
-                ],
-                confirm: "Unmute"
-            ) { model.setMuted(kind, false) })
-            return
-        }
-        model.ask(Guide(
-            id: "mute-issues",
-            title: "Mute \(kind.pluralTitle.lowercased())?",
-            points: [
-                "Issues of this kind will still be listed in the Issues tab.",
-                "They will no longer count on the Issues badge.",
-                "They will no longer show on the lock screen widget." + (kind == .delay ? " That includes the ? and ! delay marks." : ""),
-                "Unmute here or in Settings, under Muted issues.",
-            ],
-            confirm: "Mute"
-        ) { model.setMuted(kind, true) })
-    }
-
     var body: some View {
         RoundButton(symbol: isMuted ? "bell.slash.fill" : "bell.fill",
                     label: isMuted ? "Unmute \(kind.pluralTitle.lowercased())" : "Mute \(kind.pluralTitle.lowercased())",
-                    isOn: isMuted, identifier: "muteButton", action: toggle)
+                    isOn: isMuted, identifier: "muteButton") { model.toggleMute(kind) }
             .infoPopover(isMuted ? "Muted" : "Mute",
                          "Silences every issue of this kind (\(kind.pluralTitle.lowercased())), not just this one.",
                          "Muted issues stay listed here but leave the Issues badge and the lock screen widget.",
@@ -228,6 +342,7 @@ struct MuteButton: View {
 /// Open issues first, then ended ones: one section per day, most recent day and end time first.
 struct IssuesView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var location: LocationService
     @State private var selected: Issue?
 
     private var days: [(day: Int, issues: [Issue])] {
@@ -276,7 +391,7 @@ struct IssuesView: View {
         .appSheet(item: $selected, title: { $0.title },
                   subtitle: { _ in "Every update PATH sent about this." },
                   accessory: { AnyView(MuteButton(kind: $0.kind)) }) { issue in
-            IssueDetailView(issue: issue)
+            IssueDetailView(issue: issue, relevance: IssueMatcher.relevance(of: issue, station: model.station(nearest: location.station), target: nil))
         }
     }
 }

@@ -140,6 +140,15 @@ final class AppModel: ObservableObject {
         showsPeriod ? CompactTimes.clockWithPeriod(date) : CompactTimes.clock(date)
     }
 
+    /// Banners put away with their X, by id, with the day (`yyyymmdd`) it was done.
+    /// They stay away for the rest of that day.
+    @Published private(set) var dismissedBanners: [String: Int] {
+        didSet { UserDefaults.standard.set(dismissedBanners.mapValues { $0 as NSNumber }, forKey: "dismissedBanners") }
+    }
+
+    /// Made-up issues for screenshots and UI tests ("-sampleBanners YES"). Never saved.
+    private(set) var sampleIssues: [Issue] = []
+
     /// Sections the user has folded away, by name. Remembered between launches.
     @Published var foldedSections: Set<String> {
         didSet { UserDefaults.standard.set(Array(foldedSections), forKey: "foldedSections") }
@@ -167,6 +176,9 @@ final class AppModel: ObservableObject {
         hiddenColumns = Set((UserDefaults.standard.stringArray(forKey: "hiddenColumns") ?? []).compactMap(Station.init(rawValue:)))
         showsPeriod = UserDefaults.standard.object(forKey: "showsPeriod") as? Bool ?? true
         foldedSections = Set(UserDefaults.standard.stringArray(forKey: "foldedSections") ?? [])
+        let today = PathTime.ymd(of: Date())
+        dismissedBanners = ((UserDefaults.standard.dictionary(forKey: "dismissedBanners") as? [String: Int]) ?? [:]).filter { $0.value == today }
+        if UserDefaults.standard.bool(forKey: "sampleBanners") { sampleIssues = Issue.samples(now: Date()) }
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
         // "-startTab issues" on the command line opens on that tab, for screenshots and UI tests.
@@ -222,6 +234,28 @@ final class AppModel: ObservableObject {
         issues.active.filter { !mutedKinds.contains($0.kind) }
     }
 
+    // MARK: Banners
+
+    /// Open, unmuted issues that name `station` or a line from it to `target`, with why.
+    /// The station's own come first. Issues the text does not place stay on the Issues tab.
+    func relevantIssues(station: Station, target: Station?) -> [(issue: Issue, relevance: IssueRelevance)] {
+        let matched = badgeIssues.compactMap { issue in
+            IssueMatcher.relevance(of: issue, station: station, target: target).map { (issue: issue, relevance: $0) }
+        }
+        let samples = sampleIssues.map { (issue: $0, relevance: IssueRelevance.line) }
+        return (matched + samples).sorted { $0.relevance == .station && $1.relevance != .station }
+    }
+
+    func isBannerDismissed(_ id: String, now: Date) -> Bool {
+        dismissedBanners[id] == PathTime.ymd(of: now)
+    }
+
+    /// Puts a banner away until tomorrow.
+    func dismissBanner(_ id: String, now: Date) {
+        let today = PathTime.ymd(of: now)
+        dismissedBanners = dismissedBanners.filter { $0.value == today }.merging([id: today]) { _, new in new }
+    }
+
     func setMuted(_ kind: IssueKind, _ muted: Bool) {
         if muted { mutedKinds.insert(kind) } else { mutedKinds.remove(kind) }
     }
@@ -248,7 +282,7 @@ final class AppModel: ObservableObject {
     func restoreDefaults() {
         SharedStore.restoreDefaults()
         Guide.showAllAgain()
-        for key in ["textSizeStep", "customWidgetPreset", "hiddenColumns", "showsPeriod", "foldedSections"] {
+        for key in ["textSizeStep", "customWidgetPreset", "hiddenColumns", "showsPeriod", "foldedSections", "dismissedBanners"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
         manualStation = SharedStore.manualStation
@@ -259,6 +293,7 @@ final class AppModel: ObservableObject {
         hiddenColumns = []
         showsPeriod = true
         foldedSections = []
+        dismissedBanners = [:]
         reloadWidgets()
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets

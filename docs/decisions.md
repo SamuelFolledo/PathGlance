@@ -6,6 +6,12 @@ Add a line here in the same change that rewrites the owning doc. A choice made f
 
 ## 2026-11-26
 
+- Trains tab shows banners (design IN) for issues at your station or on the line on screen, plus the holiday note: one at a time, swipe for the next, dots, an X that hides one until tomorrow, tap for details. Also at the top of the stops sheet. Built. → [Trains](app/trains.md#banners)
+- An issue opens as design DA: tags, a time rail of PATH's updates, mute at the bottom. Built. → [Issues](app/issues.md)
+- The live dot sits in the row's left margin so times line up. Built. → [Trains](app/trains.md)
+- A tab's wait keeps its green or yellow when the tab is not selected, only quieter; tab names are bigger and bold, the line under them smaller and not bold, everywhere the tabs are used. Built. → [Trains](app/trains.md), [UI](shared/ui.md)
+- Tapping a column's name hides that stop's column; hidden names wait above and a tap brings one back. Built. → [Trains](app/trains.md)
+
 - The app icon is G5: eyes peeking over the silver, a blue arrow below. In the app and on the site. Dark and tinted variants are not drawn. → [The app](app/README.md)
 - Everything is named PathGlance: the Xcode project, targets, folders, bundle IDs (`com.samuelfolledo.PathGlance`, `.Widget`), the App Group (`group.com.samuelfolledo.PathGlance`) and the GitHub repo. This replaces the 2026-11-23 note that the project kept its first name. → [The app](app/README.md)
 - Widget: station names heavier than times is confirmed for every widget and preset. → [Widget](app/widget.md)
