@@ -17,6 +17,16 @@ struct BoardRulesTests {
         #expect(BoardRules.targets(from: .harrison) == [.worldTradeCenter])
     }
 
+    @Test func nameLengthCoversTheLabelAndItsDelayMark() {
+        let line = BoardLine(label: "33rd", times: [], delay: .none)
+        #expect(line.nameLength == 4)
+        let late = BoardLine(label: "33rd", times: [], delay: .minor)
+        #expect(late.nameLength == ("33rd" + DelayLevel.minor.marker).count)
+        #expect(late.text.hasPrefix(String(late.text.prefix(late.nameLength))))
+        // The second line of one destination is times only: nothing to make heavier.
+        #expect(BoardLine(label: "", times: []).nameLength == 0)
+    }
+
     @Test func hiddenDestinationsLeaveTheWidget() {
         #expect(BoardRules.widgetTargets(from: .journalSquare, hidden: [.worldTradeCenter]) == [.thirtyThirdStreet])
         // A station whose only line is turned off still shows it.

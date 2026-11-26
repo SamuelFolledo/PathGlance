@@ -8,14 +8,14 @@ enum AppInfo {
     static let developerEmail = "samuelfolledo@gmail.com"
 
     /// The landing site. `scripts/build_release.sh` uploads `landing/` here.
-    static let website = URL(string: "https://samuelfolledo.com/apps/path-schedule/")!
+    static let website = URL(string: "https://samuelfolledo.com/apps/path-glance/")!
     static let privacyPolicy = website.appending(path: "privacy.html")
     static let support = website.appending(path: "support.html")
 
     static let disclaimer = "An independent app. Not affiliated with, endorsed by, or sponsored by the Port Authority of New York and New Jersey or PATH."
 
     static var name: String {
-        info("CFBundleDisplayName") ?? info("CFBundleName") ?? "PathSchedule"
+        info("CFBundleDisplayName") ?? info("CFBundleName") ?? "PathGlance"
     }
 
     /// "1.0", as on the App Store.

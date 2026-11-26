@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One destination's trains: the date and column names fixed on top, the days stacked
+/// One destination's trains: the column names fixed on top, the days stacked in a card
 /// below. The rows come from `TrainListCache`, worked out off the main thread.
 struct TrainListPage: View {
     let origin: Station
@@ -10,7 +10,8 @@ struct TrainListPage: View {
     let arrivals: [RealtimeArrival]
     let dayTypes: DayTypeLog
     let onSelectTrain: (TrainTime, [TrainTime]) -> Void
-    let onPickDate: () -> Void
+    /// Called with the day at the top of the list and whether it has been scrolled on.
+    let onHeader: (TrainListHeader) -> Void
     let onRefresh: () async -> Void
 
     @Environment(\.openURL) private var openURL
@@ -21,6 +22,12 @@ struct TrainListPage: View {
     /// Goes up each time the list is moved from here, so the rows take the new position.
     @State private var moves = 0
     @ScaledMetric(relativeTo: .subheadline) private var columnWidth: CGFloat = 76
+
+    /// What the tab's header should show, while this is the list on screen.
+    private var header: TrainListHeader? {
+        guard isSelected, let list, let day = list.day(containing: topID) else { return nil }
+        return TrainListHeader(title: day.title, isAhead: list.isAhead(top: topID, now: now))
+    }
 
     /// What the rows are built from; a change rebuilds them.
     private struct BuildKey: Hashable {
@@ -51,10 +58,9 @@ struct TrainListPage: View {
                 let fit = max(1, Int((proxy.size.width - 32) / columnWidth) - 1)
                 let skipped = max(0, list.columns.count - fit)
 
+                let isAhead = list.isAhead(top: topID, now: now)
                 VStack(spacing: 0) {
-                    if let day = list.day(containing: topID) {
-                        dayBar(day, columns: Array(list.columns.dropFirst(skipped)))
-                    }
+                    columnNames(list.day(containing: topID), columns: Array(list.columns.dropFirst(skipped)))
                     // Equatable: scrolling changes `topID` many times a second, and the
                     // rows must not be laid out again for that.
                     TrainRows(list: list, origin: origin, target: target, skipped: skipped, moves: moves,
@@ -64,11 +70,25 @@ struct TrainListPage: View {
                               onSettle: { if isSelected { model.listAnchor = TrainList.time(of: $0) } },
                               onRefresh: onRefresh)
                         .equatable()
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .clipShape(.rect(topLeadingRadius: Theme.Radius.card, topTrailingRadius: Theme.Radius.card))
+                        // Scrolled: the rows fade out under the header, with no hard bar.
+                        .overlay(alignment: .top) {
+                            LinearGradient(colors: [Color(.systemGroupedBackground), Color(.systemGroupedBackground).opacity(0)],
+                                           startPoint: .top, endPoint: .bottom)
+                                .frame(height: 28)
+                                .opacity(isAhead ? 1 : 0)
+                                .animation(.snappy, value: isAhead)
+                                .allowsHitTesting(false)
+                        }
                 }
             } else {
                 ProgressView("Loading trains")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .onChange(of: header, initial: true) { _, header in
+            if let header { onHeader(header) }
         }
         .task(id: buildKey) {
             guard let schedule = model.schedule else { return }
@@ -126,26 +146,11 @@ struct TrainListPage: View {
     /// The widest a time gets, for sizing the columns.
     private var sampleTime: String { TrainColumn<Text>.sampleTime(showsPeriod: model.showsPeriod) }
 
-    /// Fixed above the list: the day at the top (tap for the calendar), any holiday
-    /// warning, and the column names. Today is in the accent color.
-    private func dayBar(_ day: TrainList.Day, columns: [Station]) -> some View {
+    /// Fixed above the list: any holiday warning, then the column names as plain text.
+    /// The date itself is in the tab's header (`TrainsView`).
+    private func columnNames(_ day: TrainList.Day?, columns: [Station]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(action: onPickDate) {
-                HStack(spacing: 8) {
-                    Text(day.title)
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                    Image(systemName: "calendar")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(day.title). Choose a date")
-            .accessibilityIdentifier("dayBar")
-            if let note = day.note {
+            if let note = day?.note {
                 Label(note, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
@@ -167,10 +172,18 @@ struct TrainListPage: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .overlay(alignment: .bottom) { Divider() }
+        .padding(.horizontal, Theme.Spacing.contentSide)
+        .padding(.top, Theme.Spacing.sm)
+        .padding(.bottom, 6)
     }
+}
+
+/// What the Trains header shows for the list on screen.
+struct TrainListHeader: Equatable {
+    /// "Today · Sun, Nov 22"
+    var title: String
+    /// Scrolled on past the next train: the station title makes way for the date.
+    var isAhead: Bool
 }
 
 /// What a train row's long-press menu can ask for.

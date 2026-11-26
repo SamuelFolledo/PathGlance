@@ -391,7 +391,7 @@ struct SettingsSheet: View {
             .infoPopover("Support the app", "Each one opens outside the app.", "Nothing in the app is locked behind a tip.")
 
             FoldCard(id: "settings-about", title: "About", value: AppInfo.versionText) {
-                LinkRow(title: "Email the developer", symbol: "envelope.fill", color: .blue) {
+                LinkRow(title: "Email the developer", symbol: "envelope.fill", color: Theme.Colors.brand) {
                     if let url = AppInfo.email(subject: "\(AppInfo.name) feedback") { openURL(url) }
                 }
                 .accessibilityIdentifier("emailDeveloper")
@@ -415,6 +415,11 @@ struct SettingsSheet: View {
                 }
                 .accessibilityIdentifier("privacyPolicy")
                 .infoPopover("Privacy", "Your location stays on this phone.", "No account, no ads, no tracking.", "The app only reads timetables, live times and alerts from PATH's website.")
+                LinkRow(title: "Welcome note", symbol: "hand.wave.fill", color: Theme.Colors.brand) {
+                    model.showWelcome()
+                }
+                .accessibilityIdentifier("welcomeNote")
+                .infoPopover("Welcome note", "What is live, what is the timetable, and who makes the app.", "The note shown when you first opened the app.")
                 LabeledContent("Version", value: AppInfo.versionText)
                     .padding(.vertical, Theme.Spacing.row)
                     .accessibilityIdentifier("appVersion")

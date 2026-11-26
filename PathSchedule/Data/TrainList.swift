@@ -142,15 +142,7 @@ struct TrainList: Sendable {
                                 isPast: !train.isLive && train.time <= cutoff))
             }
 
-            let offset = PathTime.calendar.dateComponents([.day], from: today, to: date).day ?? 0
-            let name: String
-            switch offset {
-            case 0: name = "Today · "
-            case 1: name = "Tomorrow · "
-            case -1: name = "Yesterday · "
-            default: name = ""
-            }
-            return Day(id: ymd, date: date, title: name + PathFormat.day(date), isToday: isToday,
+            return Day(id: ymd, date: date, title: TrainList.dayTitle(date, now: now), isToday: isToday,
                        note: dayTypes.resolution(forYMD: ymd)?.note, rows: rows)
         }
 
@@ -201,6 +193,36 @@ struct TrainList: Sendable {
             }
         }
         return onTheWay.sorted { $0.minutes < $1.minutes }.map(\.station) + [target]
+    }
+
+    /// "Today · Sun, Nov 22": a day's name in the header and in the list.
+    static func dayTitle(_ date: Date, now: Date) -> String {
+        let calendar = PathTime.calendar
+        let offset = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        let name: String
+        switch offset {
+        case 0: name = "Today · "
+        case 1: name = "Tomorrow · "
+        case -1: name = "Yesterday · "
+        default: name = ""
+        }
+        return name + PathFormat.day(date)
+    }
+
+    /// How long until a train, for the line tabs: "Now", "4 min", or the clock time once
+    /// it is an hour or more away.
+    static func waitText(until time: Date, now: Date) -> String {
+        let seconds = time.timeIntervalSince(now)
+        if seconds < 60 { return "Now" }
+        if seconds < 60 * 60 { return "\(Int(seconds / 60)) min" }
+        return CompactTimes.clockWithPeriod(time)
+    }
+
+    /// Whether the list has been scrolled on past the next train. A minute and a half of
+    /// slack, since "now" is only refreshed every minute.
+    func isAhead(top id: Double?, now: Date) -> Bool {
+        guard let id, let next = rowID(for: now.addingTimeInterval(90)) else { return false }
+        return id > next
     }
 
     // MARK: Finding rows

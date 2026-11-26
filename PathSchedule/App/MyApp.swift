@@ -14,6 +14,7 @@ import SwiftUI
             ContentView()
                 .environmentObject(model)
                 .environmentObject(LocationService.shared)
+                .tint(Theme.Colors.brand)
                 .onOpenURL { url in
                     // A tap on a widget line.
                     if let line = AppLink.parseLine(url) {

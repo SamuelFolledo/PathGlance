@@ -175,6 +175,7 @@ final class AppModel: ObservableObject {
         case "settings", "widget": tab = .widget
         default: break
         }
+        if Guide.showsWelcomeAtLaunch() { guide = .welcome }
     }
 
     /// Selecting the tab already showing resets it.
@@ -235,6 +236,11 @@ final class AppModel: ObservableObject {
         } else {
             self.guide = guide
         }
+    }
+
+    /// Shows the welcome note again, whether or not it has been silenced.
+    func showWelcome() {
+        guide = .welcome
     }
 
     /// Puts every preference back the way a fresh install has it. The timetable, the

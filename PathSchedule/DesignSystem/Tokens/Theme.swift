@@ -27,6 +27,14 @@ enum Theme {
         static let dot: CGFloat = 8
     }
 
+    /// The app's colours. `brand` is the blue of PATH's logo (#0095D3), a shade deeper in
+    /// light mode so small text on white stays readable. It is also the asset catalog's
+    /// accent colour, so `.tint` and every system control already use it; name it here
+    /// only where a colour has to be passed explicitly.
+    enum Colors {
+        static let brand = Color("AccentColor")
+    }
+
     enum Motion {
         static let sheet: Animation = .snappy(duration: 0.3)
         static let content: Animation = .smooth(duration: 0.35)

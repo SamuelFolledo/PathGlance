@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Archives PathSchedule, uploads it to TestFlight, and publishes the landing site.
+# Archives PathGlance, uploads it to TestFlight, and publishes the landing site.
 # The site lives on Dreamhost at samuelfolledo.com/apps/<SITE_SLUG>/.
 #
 # WHY: this is the one release pipeline for the app, modeled on LTPickleballHelper's
@@ -41,10 +41,10 @@ set -euo pipefail
 DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then DRY_RUN=true; fi
 
-APP_NAME="PathSchedule"
+APP_NAME="PathGlance"
 SCHEME="PathSchedule"
 TEAM_ID="9NY68F4K3P"
-SITE_SLUG="path-schedule"
+SITE_SLUG="path-glance"
 
 # Account details stay out of the repo: scripts/release.local.env (gitignored) sets
 # ASC_KEY_ID, DREAMHOST_USER and DREAMHOST_HOST. See scripts/release.env.example.

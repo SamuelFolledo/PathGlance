@@ -36,6 +36,10 @@ struct BoardLine: Hashable, Sendable {
     var text: String {
         label.isEmpty ? timesText : "\(label)\(delay.marker) \(timesText)"
     }
+
+    /// How many characters at the start of `text` are the destination and its delay mark
+    /// ("33rd?"), which the widget draws heavier than the times. Zero on a line of times only.
+    var nameLength: Int { label.isEmpty ? 0 : (label + delay.marker).count }
 }
 
 /// One destination's upcoming trains, before they are cut to what fits on a line.

@@ -1,6 +1,8 @@
-# PathSchedule
+# PathGlance
 
-Lock screen widget that shows the next PATH trains from the nearest station.
+An iPhone app and lock screen widget that show the next PATH trains from the nearest station. The app is named PathGlance; the Xcode project, targets and bundle IDs keep the working name PathSchedule.
+
+Not made, endorsed or supported by PATH or the Port Authority.
 
 ```
 From J Sq: 7:05 AM ↻
@@ -40,7 +42,7 @@ WTC 7:08 :14 :20 :26 :32
 
 ## What each station shows
 
-These are the defaults. Settings > Lines shown turns destinations off; a station left
+These are the defaults. Widget > Lines shown turns destinations off; a station left
 with one line gives it both widget rows. When the same trains serve both destinations
 they are listed once under a joint label such as `JSQ+HOB`.
 
@@ -59,11 +61,16 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
 
 ## Layout
 
-- `PathSchedule/` app (iOS 26): three tabs. Trains (lock screen preview, then one list per
-  destination with a column per favorite stop, a week back to two weeks ahead), Issues
-  (current and archived) and Settings. Also the timetable import and archive, and location.
-  `UI/` holds the in-tab sheet, the press-and-hold info popover and the radio, check and
-  fold rows.
+- `PathSchedule/` app (iOS 26). Three tabs: Trains (one list per destination with a column
+  per favorite stop, a week back to two weeks ahead), Issues (current and archived) and
+  Widget (the lock screen preview, presets and look, with Settings behind its menu button).
+  - `App/` the entry point, the tab bar, the model, app facts and links
+  - `Data/` the timetable import and archive, train lists, location
+  - `DesignSystem/Tokens/` the one set of measurements and the brand colour (`Theme`)
+  - `DesignSystem/UI/` what screens are built from: `Sheet/` (the in-tab sheet), `Popover/`
+    (menus and the station list), `Alert/` (guides and their full-width buttons), `Rows/`
+    (radio, check, fold, link and open rows, the press-and-hold info popover)
+  - `Features/` one folder per tab
 - `PathScheduleWidget/` widget extension
 - `Shared/` compiled into both: stations, schedule queries, board rules, real-time feed,
   alerts and the issue log, day-type learning, widget fonts and links
@@ -71,6 +78,20 @@ Hoboken at night), its times fill both lines. Edit `BoardRules` in `Shared/Board
   (`Fixture.swift`), so they need no network.
 - `PathScheduleUITests/` UI tests that drive the app against PATH's live data.
 - `Config/` entitlements and Info.plists
+- `landing/` the website, and `scripts/` the release script
+- `docs/` everything written down about the app
+
+## Docs
+
+Start at [`docs/README.md`](docs/README.md).
+
+- How each screen behaves: [Trains](docs/app/trains.md) · [Issues](docs/app/issues.md) ·
+  [Widget and Settings](docs/app/widget.md) · [Welcome note and guides](docs/app/welcome-and-guides.md)
+- What screens share: [UI rules and pieces](docs/shared/ui.md) · [Where the data comes from](docs/shared/data.md)
+- [Glossary](docs/glossary.md)
+- How we work: [Releases](docs/process/releases.md) · [Tests](docs/process/ui-tests.md)
+- [Pictures](docs/visuals/README.md): icons, header options, tab ideas, wireframes
+- [What is left to do, and what is done](docs/todos.md) · [Decisions](docs/decisions.md) · [Ideas](docs/ideas.md)
 
 ## Tests
 
@@ -79,7 +100,8 @@ xcodebuild test -scheme PathSchedule -destination 'platform=iOS Simulator,name=i
 ```
 
 Add `-only-testing:PathScheduleTests` for the unit tests alone. Set
-`TEST_RUNNER_SHOT_DIR=/some/folder` to keep a screenshot of each UI test step.
+`TEST_RUNNER_SHOT_DIR=/some/folder` to keep a screenshot of each UI test step. More in
+[`docs/process/ui-tests.md`](docs/process/ui-tests.md).
 
 ## Setup
 

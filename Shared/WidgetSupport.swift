@@ -46,6 +46,11 @@ enum WidgetFontStyle: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Always smaller than `bodyFont`.
     func headerFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).header, weight: .medium) }
     func bodyFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).body, weight: .medium) }
+    /// Station names, heavier than the times beside them: the header's station and each
+    /// line's destination label.
+    static let nameWeight = Font.Weight.bold
+    func headerNameFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).header, weight: Self.nameWeight) }
+    func nameFont(_ density: WidgetDensity) -> Font { font(size: sizes(density).body, weight: Self.nameWeight) }
 }
 
 /// The whole lock screen widget: the header row, then the train lines. The widget and the
@@ -81,7 +86,9 @@ struct BoardWidgetView<Header: View, TapArea: View>: View {
 
     private var headerRow: some View {
         HStack(spacing: 4) {
-            Text("From \(board.station.shortName): \(CompactTimes.clockWithPeriod(fetchedAt))")
+            Text("From ")
+                + Text(board.station.shortName).font(fontStyle.headerNameFont(style.density))
+                + Text(": \(CompactTimes.clockWithPeriod(fetchedAt))")
             Image(systemName: "arrow.clockwise")
             if board.hasAlert {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -119,7 +126,14 @@ struct BoardWidgetView<Header: View, TapArea: View>: View {
         var text = AttributedString()
         for (index, line) in board.lines(perLine: count).enumerated() {
             if index > 0 { text += AttributedString("\n") }
-            text += decorate?(index, count, line.text) ?? AttributedString(line.text)
+            var styled = decorate?(index, count, line.text) ?? AttributedString(line.text)
+            // The destination is heavier than its times, so the eye finds the line first.
+            let name = line.nameLength
+            if name > 0, name <= styled.characters.count {
+                let end = styled.index(styled.startIndex, offsetByCharacters: name)
+                styled[styled.startIndex..<end].font = fontStyle.nameFont(style.density)
+            }
+            text += styled
         }
         return Text(text)
             .lineLimit(max(board.lines(perLine: count).count, 1))

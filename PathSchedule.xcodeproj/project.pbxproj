@@ -47,6 +47,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		000000000000000000000035 /* docs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = docs; sourceTree = "<group>"; };
 		000000000000000000000031 /* PathSchedule.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathSchedule.entitlements; sourceTree = "<group>"; };
 		000000000000000000000032 /* PathScheduleWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathScheduleWidget.entitlements; sourceTree = "<group>"; };
 		000000000000000000000033 /* PathScheduleWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PathScheduleWidget-Info.plist"; sourceTree = "<group>"; };
@@ -112,6 +113,7 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000000035 /* docs */,
 				000000000000000000000010 /* PathSchedule */,
 				000000000000000000000012 /* PathScheduleWidget */,
 				000000000000000000000011 /* Shared */,
@@ -479,6 +481,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "PathSchedule" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/PathSchedule.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -486,6 +489,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -518,6 +522,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "PathSchedule" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/PathSchedule.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -525,6 +530,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/PathSchedule-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PathSchedule keeps the lock screen on your nearest PATH station as you travel.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PathSchedule uses your location to show trains from the nearest PATH station.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -563,7 +569,7 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/PathScheduleWidget-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = PathSchedule;
+				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -591,7 +597,7 @@
 				DEVELOPMENT_TEAM = 9NY68F4K3P;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/PathScheduleWidget-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = PathSchedule;
+				INFOPLIST_KEY_CFBundleDisplayName = PathGlance;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

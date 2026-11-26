@@ -30,6 +30,31 @@ struct TrainListTests {
         #expect(built.days[6].title.hasPrefix("Yesterday · "))
     }
 
+    @Test func waitOnATabIsNowThenMinutesThenTheClock() {
+        #expect(TrainList.waitText(until: now.addingTimeInterval(40), now: now) == "Now")
+        #expect(TrainList.waitText(until: now.addingTimeInterval(4 * 60 + 30), now: now) == "4 min")
+        #expect(TrainList.waitText(until: now.addingTimeInterval(59 * 60), now: now) == "59 min")
+        #expect(TrainList.waitText(until: Fixture.date("2026-11-24 09:15"), now: now) == "9:15 AM")
+    }
+
+    @Test func headerDateFollowsTheDayAtTheTop() {
+        #expect(TrainList.dayTitle(now, now: now).hasPrefix("Today · "))
+        #expect(TrainList.dayTitle(now.addingTimeInterval(24 * 60 * 60), now: now).hasPrefix("Tomorrow · "))
+        #expect(!TrainList.dayTitle(now.addingTimeInterval(3 * 24 * 60 * 60), now: now).contains(" · "))
+    }
+
+    @Test func listIsAheadOnlyOncePastTheNextTrain() throws {
+        let built = list(.journalSquare, .thirtyThirdStreet)
+        let ids = built.days.flatMap(\.rows).map(\.id)
+        let next = try #require(built.rowID(for: now))
+        let index = try #require(ids.firstIndex(of: next))
+        #expect(!built.isAhead(top: next, now: now), "At the next train the station title shows")
+        #expect(!built.isAhead(top: ids[index - 3], now: now), "And on earlier trains")
+        #expect(!built.isAhead(top: built.days[2].headerID, now: now), "And on an earlier day")
+        #expect(built.isAhead(top: ids[index + 6], now: now), "Scrolled on, the date takes the title's place")
+        #expect(!built.isAhead(top: nil, now: now))
+    }
+
     @Test func withNoFavoritesTheOnlyColumnIsTheDestination() {
         #expect(list(.journalSquare, .thirtyThirdStreet).columns == [.thirtyThirdStreet])
     }

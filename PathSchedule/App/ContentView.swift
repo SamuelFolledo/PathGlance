@@ -92,6 +92,9 @@ struct AppTabBar: View {
     private var stationButton: some View {
         let station = model.station(nearest: location.station)
         return Button {
+            // Choosing a station is about the trains, so the list it changes comes forward
+            // first and the menu opens over it.
+            if model.tab != .trains, !showsStations { model.select(.trains) }
             showsStations.toggle()
         } label: {
             Text(station.badge)

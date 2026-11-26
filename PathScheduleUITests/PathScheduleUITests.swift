@@ -11,8 +11,9 @@ final class PathScheduleUITests: XCTestCase {
         app = XCUIApplication()
     }
 
-    private func launch(tab: String = "trains") {
-        app.launchArguments = ["-startTab", tab]
+    private func launch(tab: String = "trains", extra: [String] = []) {
+        // The welcome note has a test of its own; everywhere else it would be in the way.
+        app.launchArguments = ["-startTab", tab, "-skipWelcome", "YES"] + extra
         app.launch()
     }
 
@@ -27,7 +28,7 @@ final class PathScheduleUITests: XCTestCase {
         }
     }
 
-    private var picker: XCUIElement { app.segmentedControls["destinationPicker"] }
+    private var picker: XCUIElement { app.otherElements["destinationPicker"] }
 
     /// Guides explain an action the first time. Accept one if it is showing.
     private func confirmGuideIfShown() {
@@ -77,6 +78,38 @@ final class PathScheduleUITests: XCTestCase {
         left.press(forDuration: 0.05, thenDragTo: right, withVelocity: .fast, thenHoldForDuration: 0)
         XCTAssertTrue(second.waitForSelected())
     }
+
+    /// At rest the station is the title with the date under it. Scrolled on, the title
+    /// leaves and the date stays; back at now, the title returns. The same at large text.
+    func testHeaderGivesWayToTheDateWhenScrolled() {
+        for (name, extra) in [("09-header", []), ("10-header-large", ["-textSizeStep", "<integer>\(largeTextStep)</integer>"])] {
+            launch(extra: extra)
+            XCTAssertTrue(picker.waitForExistence(timeout: 30))
+            let title = app.buttons["originMenu"].firstMatch
+            let date = app.buttons["dayBar"].firstMatch
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'")).firstMatch.waitForExistence(timeout: 10))
+            XCTAssertTrue(title.exists, "The station title shows at rest")
+            XCTAssertTrue(date.exists && date.label.hasPrefix("Today"), "The date shows at rest")
+            XCTAssertLessThan(title.frame.maxY, date.frame.maxY, "The date sits under the title")
+            shot("\(name)-rest")
+
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -260)))
+            XCTAssertTrue(title.waitForNonExistence(timeout: 5), "Scrolled on, the station title leaves")
+            XCTAssertTrue(date.exists && date.isHittable, "The date is always there")
+            XCTAssertEqual(picker.buttons.count, 3, "The tabs stay")
+            shot("\(name)-scrolled")
+
+            // Back up past the next train: the title returns.
+            from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 420)))
+            XCTAssertTrue(title.waitForExistence(timeout: 5), "Back at now or earlier, the station title returns")
+            XCTAssertTrue(date.exists)
+            app.terminate()
+        }
+    }
+
+    /// The largest step of Settings > Text size.
+    private let largeTextStep = 6
 
     func testFavoriteStopAddsAColumn() {
         launch()
@@ -147,6 +180,17 @@ final class PathScheduleUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 5), "Scrolling hours ahead should offer a way back to now")
         back.tap()
         XCTAssertTrue(back.waitForNonExistence(timeout: 8))
+    }
+
+    func testStationButtonBringsTheTrainsTabForward() {
+        launch(tab: "issues")
+        let button = app.buttons["stationButton"].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["tab-issues"].isSelected, "The Issues tab should be the one showing")
+        button.tap()
+        XCTAssertTrue(app.buttons["station-hoboken"].waitForExistence(timeout: 5), "The station list should open")
+        XCTAssertTrue(app.buttons["tab-trains"].isSelected, "The Trains tab should be behind the list")
+        shot("20-station-from-issues")
     }
 
     func testStationButtonChangesTheStation() {
@@ -239,6 +283,8 @@ final class PathScheduleUITests: XCTestCase {
 
         let restore = app.buttons["restoreDefaults"]
         reveal(restore)
+        // The last row can come to rest behind the tab bar, where it still counts as hittable.
+        for _ in 0..<3 where restore.frame.maxY > app.buttons["tab-trains"].frame.minY - 8 { app.swipeUp() }
         restore.tap()
         XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["guideDontShowAgain"].exists, "A destructive action always asks")
@@ -296,6 +342,38 @@ final class PathScheduleUITests: XCTestCase {
         let text = [version.label, version.value as? String ?? ""].joined(separator: " ")
         XCTAssertNotNil(text.range(of: #"\d+\.\d+(\.\d+)? \(\d+\)"#, options: .regularExpression), "Got: \(text)")
         shot("18-about")
+    }
+
+    func testWelcomeShowsUntilSilenced() {
+        // An empty list on the command line stands in for a fresh install's.
+        app.launchArguments = ["-silencedGuides", "()"]
+        app.launch()
+        let gotIt = app.buttons["guideConfirm"]
+        XCTAssertTrue(gotIt.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["guideCancel"].exists)
+        XCTAssertEqual(gotIt.label, "Got it")
+        // One button spans the popup: far wider than its title needs.
+        XCTAssertGreaterThan(gotIt.frame.width, app.windows.firstMatch.frame.width * 0.6)
+        shot("19-welcome")
+        app.buttons["guideDontShowAgain"].tap()
+        gotIt.tap()
+        XCTAssertTrue(gotIt.waitForNonExistence(timeout: 5))
+
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
+        XCTAssertTrue(app.buttons["tab-trains"].waitForExistence(timeout: 30))
+        XCTAssertFalse(gotIt.waitForExistence(timeout: 3))
+
+        // Still there to read under Settings, About.
+        app.buttons["tab-widget"].tap()
+        app.buttons["settingsButton"].tap()
+        let note = app.buttons["welcomeNote"]
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        reveal(note)
+        note.tap()
+        XCTAssertTrue(gotIt.waitForExistence(timeout: 5))
+        gotIt.tap()
     }
 
     func testHidingALineIsExplainedFirst() {

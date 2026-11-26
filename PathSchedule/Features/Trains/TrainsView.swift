@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The home tab: the station as the title, then one panel with destination tabs and the
-/// date fixed on top and the trains scrolling beneath, day after day. Swiping sideways
-/// turns to the next destination at the same time of the same day.
+/// The home tab. The station is the title with the date as its subtitle, then underline
+/// tabs for the destinations with the next train under each name, then the trains, day
+/// after day. Scrolled on past the next train, the station title leaves and the date takes
+/// its place. Swiping sideways turns to the next destination at the same time of day.
 struct TrainsView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var location: LocationService
@@ -15,6 +16,10 @@ struct TrainsView: View {
     /// The page the sideways scroll is on.
     @State private var page: Station?
     @State private var showsStations = false
+    /// The day at the top of the list on screen, and whether it has been scrolled on.
+    @State private var header: TrainListHeader?
+    /// The next train to each destination, for the waits on the tabs.
+    @State private var nextTrains: [Station: TrainTime] = [:]
 
     private enum Sheet: Identifiable {
         case favorites
@@ -32,6 +37,16 @@ struct TrainsView: View {
 
     private struct DatePick: Identifiable {
         let id = "date"
+    }
+
+    /// What the waits on the tabs are worked out from.
+    private struct WaitKey: Hashable {
+        var origin: Station
+        var hidden: Set<Station>
+        var imported: Date?
+        var now: Date
+        var arrivalCount: Int
+        var firstArrival: Date?
     }
 
     private var origin: Station {
@@ -53,11 +68,14 @@ struct TrainsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            title
+        VStack(spacing: Theme.Spacing.sm) {
             if let schedule = model.schedule {
+                top(shown)
                 panel(schedule)
             } else {
+                title
+                    .padding(.horizontal, Theme.Spacing.contentSide)
+                    .padding(.top, Theme.Spacing.sm)
                 emptyState
             }
         }
@@ -65,7 +83,7 @@ struct TrainsView: View {
         .overlay(alignment: .bottomTrailing) {
             if isAway {
                 Button {
-                    model.jump(to: Date())
+                    backToNow()
                 } label: {
                     Label("Now", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                         .font(.subheadline.weight(.semibold))
@@ -96,8 +114,13 @@ struct TrainsView: View {
         .appSheet(item: $datePicker, style: .popup, title: { _ in "Go to date" }) { _ in
             DateJumpView(now: now, viewing: model.listAnchor) { date in
                 datePicker = nil
+                now = Date()
                 model.jump(to: date)
             }
+        }
+        .task(id: WaitKey(origin: origin, hidden: model.hiddenTargets, imported: model.schedule?.importedAt, now: now,
+                          arrivalCount: arrivals.count, firstArrival: arrivals.first?.arrival)) {
+            updateWaits()
         }
         .task(id: origin) {
             await reload()
@@ -143,7 +166,64 @@ struct TrainsView: View {
         }
     }
 
+    private func backToNow() {
+        now = Date()
+        model.jump(to: now)
+    }
+
+    /// The next train to each destination, live where the feed has it.
+    private func updateWaits() {
+        guard let schedule = model.schedule else {
+            nextTrains = [:]
+            return
+        }
+        var plan = BoardPlan(station: origin, targets: destinations(schedule), schedule: schedule, now: now, limit: 1)
+        if model.useRealtime { plan.apply(realtime: arrivals, now: now) }
+        var next: [Station: TrainTime] = [:]
+        for group in plan.groups {
+            next[group.target] = group.trains.first
+        }
+        nextTrains = next
+    }
+
+    /// The header's state: what the list on screen reports, or today until it has loaded.
+    private var shown: TrainListHeader {
+        header ?? TrainListHeader(title: TrainList.dayTitle(model.listAnchor, now: now), isAhead: false)
+    }
+
     // MARK: Pieces
+
+    /// The station title with the date under it. Scrolled on, the title leaves and the
+    /// date is the title. The date is always there: it is the way to the calendar.
+    private func top(_ state: TrainListHeader) -> some View {
+        VStack(spacing: 2) {
+            if !state.isAhead {
+                title
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            Button {
+                datePicker = DatePick()
+            } label: {
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text(state.title)
+                        .font(state.isAhead ? .title3.weight(.bold) : .subheadline.weight(.bold))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(Theme.Colors.brand)
+                .frame(maxWidth: .infinity)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(state.title). Choose a date")
+            .accessibilityIdentifier("dayBar")
+        }
+        .padding(.horizontal, Theme.Spacing.contentSide)
+        .padding(.top, Theme.Spacing.sm)
+        .animation(.snappy, value: state.isAhead)
+    }
 
     /// "From Journal Square", centered. Tap for the station list and favorite stops.
     private var title: some View {
@@ -153,6 +233,8 @@ struct TrainsView: View {
             HStack(spacing: Theme.Spacing.xs) {
                 Text("From \(origin.name)")
                     .font(.title3.weight(.bold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
                 Image(systemName: "chevron.down")
                     .font(.footnote.weight(.bold))
             }
@@ -165,32 +247,29 @@ struct TrainsView: View {
         .frame(maxWidth: .infinity)
         .accessibilityLabel("From \(origin.name). Change station")
         .accessibilityIdentifier("originMenu")
-        .padding(.horizontal, Theme.Spacing.contentSide)
-        .padding(.top, Theme.Spacing.sm)
     }
 
-    /// Destination tabs fixed at the top of one surface, the lists paging beneath.
+    /// The wait under a line's name on its tab.
+    private func tab(_ station: Station) -> UnderlineTab<Station> {
+        let next = nextTrains[station]
+        return UnderlineTab(id: station, title: station.lineLabel,
+                            detail: next.map { TrainList.waitText(until: $0.time, now: now) } ?? "No trains",
+                            detailColor: next?.isLate == true ? .yellow : .green,
+                            spokenTitle: station.name)
+    }
+
+    /// Destination tabs fixed on top, the lists paging beneath.
     private func panel(_ schedule: ScheduleData) -> some View {
         let destinations = destinations(schedule)
         let current = selected(in: destinations)
 
         return VStack(spacing: 0) {
-            Picker("Destination", selection: Binding(
-                get: { current ?? origin },
-                set: { target in
-                    model.browseTarget = target
-                    withAnimation(.snappy) { page = target }
-                }
-            )) {
-                ForEach(destinations) { station in
-                    Text(station.lineLabel)
-                        .accessibilityLabel(station.name)
-                        .tag(station)
-                }
+            UnderlineTabs(tabs: destinations.map(tab), selection: current) { target in
+                model.browseTarget = target
+                withAnimation(.snappy) { page = target }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, Theme.Spacing.contentSide)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("destinationPicker")
 
             ScrollView(.horizontal) {
@@ -199,7 +278,7 @@ struct TrainsView: View {
                         TrainListPage(origin: origin, target: target, isSelected: target == current, now: now,
                                       arrivals: arrivals, dayTypes: dayTypes,
                                       onSelectTrain: { train, trains in sheet = .stops(train, target: target, trains: trains) },
-                                      onPickDate: { datePicker = DatePick() },
+                                      onHeader: { header = $0 },
                                       onRefresh: {
                                           await reload()
                                           await model.refreshIssues()
@@ -212,6 +291,7 @@ struct TrainsView: View {
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
+            .padding(.horizontal, Theme.Spacing.contentSide)
             .onScrollPhaseChange { _, phase in
                 // Only once the swipe has come to rest: changing the selection while the
                 // page is still moving stops it and it springs back.
@@ -228,9 +308,6 @@ struct TrainsView: View {
                 if page == nil { page = current }
             }
         }
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(.rect(topLeadingRadius: Theme.Radius.card, topTrailingRadius: Theme.Radius.card))
-        .padding(.horizontal, Theme.Spacing.contentSide)
         .ignoresSafeArea(edges: .bottom)
     }
 
@@ -488,12 +565,9 @@ struct DateJumpView: View {
                     let isToday = PathTime.ymd(of: picked) == PathTime.ymd(of: now)
                     onPick(isToday ? Date() : PathTime.calendar.startOfDay(for: picked))
                 }
-            Button {
+            WideButton(title: "Back to now", symbol: "clock.arrow.circlepath") {
                 onPick(Date())
-            } label: {
-                Label("Back to now", systemImage: "clock.arrow.circlepath")
             }
-            .buttonStyle(.glass)
         }
     }
 }

@@ -7,7 +7,7 @@ extension IssueKind {
         case .delay: return .yellow
         case .suspension: return .red
         case .plannedWork: return .orange
-        case .elevator: return .blue
+        case .elevator: return Theme.Colors.brand
         case .other: return .gray
         }
     }

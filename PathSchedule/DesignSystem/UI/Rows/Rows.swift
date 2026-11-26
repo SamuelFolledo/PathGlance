@@ -77,14 +77,28 @@ struct RadioRow<Label: View>: View {
     }
 }
 
+/// The outline of a check mark. Round in a list of choices; square when the check stands
+/// alone in an alert or guide, or beside a section title ("Don't show this again").
+enum CheckShape {
+    case round, square
+
+    func symbol(isOn: Bool) -> String {
+        switch self {
+        case .round: isOn ? "checkmark.circle.fill" : "circle"
+        case .square: isOn ? "checkmark.square.fill" : "square"
+        }
+    }
+}
+
 /// Any number of several: a check mark that toggles.
 struct CheckRow<Label: View>: View {
     let isOn: Bool
+    var shape: CheckShape = .round
     let action: () -> Void
     @ViewBuilder let label: Label
 
     var body: some View {
-        ChoiceRow(symbol: isOn ? "checkmark.circle.fill" : "circle", isOn: isOn, action: action) { label }
+        ChoiceRow(symbol: shape.symbol(isOn: isOn), isOn: isOn, action: action) { label }
     }
 }
 
