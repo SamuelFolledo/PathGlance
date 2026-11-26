@@ -55,10 +55,28 @@ struct BoardProvider: TimelineProvider {
         let now = Date()
         let fontStyle = SharedStore.fontStyle
         let style = SharedStore.widgetStyle
-        guard var schedule = SharedStore.loadSchedule(now: now) else {
-            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: "Open PathGlance to download the timetable", fontStyle: fontStyle, style: style)
+        guard let plan = await plan(now: now, style: style) else {
+            let entry = BoardEntry(date: now, board: nil, fetchedAt: now, message: BoardProvider.noTimetable, fontStyle: fontStyle, style: style)
             return ([entry], now.addingTimeInterval(30 * 60))
         }
+        let entries = plan.refreshDates(from: now).map { date in
+            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle, style: style)
+        }
+        return (entries, reloadDate(from: now))
+    }
+
+    static let noTimetable = "Open PathGlance to download the timetable"
+
+    /// Reload regularly to pick up a new station and fresh predictions.
+    /// The app also reloads the widgets whenever the station changes.
+    static func reloadDate(from now: Date) -> Date {
+        now.addingTimeInterval(SharedStore.useRealtime ? 20 * 60 : 60 * 60)
+    }
+
+    /// The trains from the current station with live times and issues applied: what both
+    /// widgets draw from. `nil` until the app has downloaded a timetable.
+    static func plan(now: Date, style: WidgetStyle) async -> BoardPlan? {
+        guard var schedule = SharedStore.loadSchedule(now: now) else { return nil }
 
         let station = await currentStation()
         let useRealtime = SharedStore.useRealtime
@@ -91,14 +109,7 @@ struct BoardProvider: TimelineProvider {
         }
         issues.save()
         plan.apply(issues: issues.active, muted: SharedStore.mutedKinds)
-
-        let entries = plan.refreshDates(from: now).map { date in
-            BoardEntry(date: date, board: plan.board(at: date), fetchedAt: now, fontStyle: fontStyle, style: style)
-        }
-        // Reload regularly to pick up a new station and fresh predictions.
-        // The app also reloads the widget whenever the station changes.
-        let reload = now.addingTimeInterval(useRealtime ? 20 * 60 : 60 * 60)
-        return (entries, reload)
+        return plan
     }
 
     /// Manual choice first, then whichever is newer: the widget's own location fix
@@ -150,7 +161,6 @@ struct BoardView: View {
     }
 }
 
-@main
 struct PathGlanceWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: SharedStore.widgetKind, provider: BoardProvider()) { entry in
@@ -159,5 +169,97 @@ struct PathGlanceWidget: Widget {
         .configurationDisplayName("Next PATH trains")
         .description("Upcoming departures from the nearest PATH station.")
         .supportedFamilies([.accessoryRectangular, .systemMedium])
+    }
+}
+
+// MARK: Round widget
+
+struct RoundEntry: TimelineEntry {
+    let date: Date
+    let board: Board?
+    var look = RoundLook()
+    var line: Station?
+
+    static var sample: RoundEntry {
+        RoundEntry(date: BoardEntry.sample.date, board: BoardEntry.sample.board)
+    }
+}
+
+/// The round widget counts minutes, so its timeline has an entry for every minute until
+/// the next reload.
+struct RoundProvider: TimelineProvider {
+    func placeholder(in context: Context) -> RoundEntry {
+        .sample
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (RoundEntry) -> Void) {
+        if context.isPreview {
+            completion(.sample)
+            return
+        }
+        Task {
+            let result = await RoundProvider.build()
+            completion(result.entries.first ?? .sample)
+        }
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<RoundEntry>) -> Void) {
+        Task {
+            let result = await RoundProvider.build()
+            completion(Timeline(entries: result.entries, policy: .after(result.reload)))
+        }
+    }
+
+    private static func build() async -> (entries: [RoundEntry], reload: Date) {
+        let now = Date()
+        let look = SharedStore.roundLook
+        let line = SharedStore.roundLine
+        guard let plan = await BoardProvider.plan(now: now, style: WidgetStyle()) else {
+            return ([RoundEntry(date: now, board: nil, look: look, line: line)], now.addingTimeInterval(30 * 60))
+        }
+        let reload = BoardProvider.reloadDate(from: now)
+        return (RoundFace.minuteDates(from: now, until: reload.addingTimeInterval(10 * 60)).map { date in
+            RoundEntry(date: date, board: plan.board(at: date), look: look, line: line)
+        }, reload)
+    }
+}
+
+struct RoundView: View {
+    let entry: RoundEntry
+
+    var body: some View {
+        let face = entry.board.flatMap { RoundFace.make(board: $0, content: entry.look.content, line: entry.line, now: entry.date) }
+        ZStack {
+            AccessoryWidgetBackground()
+            RoundWidgetView(face: face, look: entry.look)
+        }
+        .widgetURL(link)
+        .containerBackground(.clear, for: .widget)
+    }
+
+    /// Tapping the circle opens its line's trains in the app.
+    private var link: URL? {
+        guard let board = entry.board else { return nil }
+        let row = board.rows.first { $0.target == entry.line } ?? board.rows.first
+        return row.map { AppLink.line(from: board.station, to: $0.target) }
+    }
+}
+
+struct PathGlanceRoundWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: SharedStore.roundWidgetKind, provider: RoundProvider()) { entry in
+            RoundView(entry: entry)
+        }
+        .configurationDisplayName("Next PATH train")
+        .description("One line's next train, in a single lock screen slot.")
+        .supportedFamilies([.accessoryCircular])
+    }
+}
+
+@main
+struct PathGlanceWidgets: WidgetBundle {
+    var body: some Widget {
+        PathGlanceWidget()
+        PathGlanceRoundWidget()
     }
 }

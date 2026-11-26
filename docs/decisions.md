@@ -6,6 +6,10 @@ Add a line here in the same change that rewrites the owning doc. A choice made f
 
 ## 2026-11-26
 
+- Two lock screen widgets: Rectangle (the existing one) and Round (one slot). Apple's WidgetKit has nothing wider than the rectangle, so a full-width widget is dropped. Round has five presets: Minutes, Clock time, Countdown ring, Next two, Two lines. Built. → [Widget](app/widget.md)
+- The Widget tab's preview is a carousel of presets with the neighbours peeking in; it replaces the Presets row and its sheet. Underline tabs pick the shape and the pages slide like the Trains lines. Built. → [Widget](app/widget.md), [UI](shared/ui.md)
+- Each shape remembers one custom look, kept the moment a preset is changed. Built. → [Widget](app/widget.md)
+- **Default, waiting for the owner's answer:** the settings both shapes share sit last, under "Both widgets"; and the round presets' fonts (Standard, Standard, Standard, Rounded, Condensed). → [Widget](app/widget.md#open-questions)
 - Trains tab shows banners (design IN) for issues at your station or on the line on screen, plus the holiday note: one at a time, swipe for the next, dots, an X that hides one until tomorrow, tap for details. Also at the top of the stops sheet. Built. → [Trains](app/trains.md#banners)
 - An issue opens as design DA: tags, a time rail of PATH's updates, mute at the bottom. Built. → [Issues](app/issues.md)
 - The live dot sits in the row's left margin so times line up. Built. → [Trains](app/trains.md)

@@ -5,6 +5,7 @@ enum SharedStore {
     /// Must match the App Group in both .entitlements files.
     static let appGroup = "group.com.samuelfolledo.PathGlance"
     static let widgetKind = "PathBoard"
+    static let roundWidgetKind = "PathRound"
 
     static var defaults: UserDefaults {
         UserDefaults(suiteName: appGroup) ?? .standard
@@ -91,7 +92,8 @@ enum SharedStore {
 
     /// Every setting kept here, for "Restore defaults".
     static let preferenceKeys = ["manualStation", "useRealtime", "mutedIssueKinds", "favoriteStops", "hiddenTargets",
-                                 "widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle"]
+                                 "widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle",
+                                 "roundContent", "roundFont", "roundLine"]
 
     static func restoreDefaults() {
         for key in preferenceKeys {
@@ -140,5 +142,25 @@ enum SharedStore {
     static var fontStyle: WidgetFontStyle {
         get { defaults.string(forKey: "fontStyle").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard }
         set { defaults.set(newValue.rawValue, forKey: "fontStyle") }
+    }
+
+    // MARK: Round widget
+
+    /// The look the round widget draws with: what was last saved in the app.
+    static var roundLook: RoundLook {
+        get {
+            RoundLook(content: defaults.string(forKey: "roundContent").flatMap(RoundContent.init(rawValue:)) ?? .minutes,
+                      font: defaults.string(forKey: "roundFont").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard)
+        }
+        set {
+            defaults.set(newValue.content.rawValue, forKey: "roundContent")
+            defaults.set(newValue.font.rawValue, forKey: "roundFont")
+        }
+    }
+
+    /// The line the round widget follows. `nil` is the station's first line shown.
+    static var roundLine: Station? {
+        get { defaults.string(forKey: "roundLine").flatMap(Station.init(rawValue:)) }
+        set { defaults.set(newValue?.rawValue, forKey: "roundLine") }
     }
 }

@@ -114,18 +114,8 @@ struct IssueBannerStack: View {
                 // As tall as the tallest banner and no taller; each banner fills that.
                 .fixedSize(horizontal: false, vertical: true)
 
-                if items.count > 1 {
-                    HStack(spacing: 6) {
-                        ForEach(items.indices, id: \.self) { dot in
-                            Circle()
-                                .fill(dot == index ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Notice \(index + 1) of \(items.count)")
+                PageDots(count: items.count, index: index, noun: "Notice")
                     .accessibilityIdentifier("issueBannerDots")
-                }
             }
             .animation(Theme.Motion.content, value: items)
             .onChange(of: items.map(\.id)) { _, ids in

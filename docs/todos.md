@@ -29,6 +29,9 @@ Open work, in one list. No tickets, no board.
 - [ ] Decide on the Issues tab ideas IA to IF and the Widget tab ideas WA to WF (2026-11-23)
 	- Issues round two drawn (IG to IN, detail sheets DA and DB). DA chosen as the detail sheet and IN liked for the Trains tab (2026-11-25); both built 2026-11-26. The list layout is still open
 	- Widget tab: drawings asked for underline tabs switching the preview between half and full width, and for a small one-slot widget; not decided (2026-11-25)
+	- Widget tab decided and built: Rectangle and Round shapes behind underline tabs, a preset carousel in place of the Presets row, a custom look per shape, five round presets (2026-11-26)
+	- Waiting for answers: shared settings first or last; the round presets' fonts and pairings; approval of the eleven rectangle presets (2026-11-26)
+	- Add the round widget to a real lock screen and check it reads well at its real size (2026-11-26)
 
 ## After the look is final
 

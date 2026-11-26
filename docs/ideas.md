@@ -18,7 +18,6 @@ Things that might be worth doing and that nobody has agreed to yet. Nothing here
 
 ## Widget
 
-- A small one-slot lock screen widget, beside the current two-slot one (2026-11-25)
 - Preview the widget's states (delayed, last train, no service) from the Widget tab (drawing WF) (2026-11-23)
 
 ## App

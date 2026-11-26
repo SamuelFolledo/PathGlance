@@ -76,7 +76,9 @@ final class AppModel: ObservableObject {
 
     /// The look being edited in the Widget tab. The widget itself keeps `savedLook`
     /// until Save is tapped.
-    @Published var look: WidgetLook
+    @Published var look: WidgetLook {
+        didSet { rememberCustom() }
+    }
     /// What the widget is drawing with.
     @Published private(set) var savedLook: WidgetLook
     /// The last look saved that was not one of the built-in presets.
@@ -97,24 +99,55 @@ final class AppModel: ObservableObject {
         set { look.style = newValue }
     }
 
-    var hasUnsavedLook: Bool { look != savedLook }
+    /// The round widget's look being edited, what its widget draws with, and the last
+    /// round look that was not a built-in preset. Each shape remembers its own custom look.
+    @Published var roundLook: RoundLook {
+        didSet { rememberCustom() }
+    }
+    @Published private(set) var savedRoundLook: RoundLook
+    @Published private(set) var customRoundPreset: CustomRoundPreset?
 
-    /// Drops the edits not yet saved: the preview goes back to what the widget shows.
-    func revertLook() {
-        look = savedLook
+    struct CustomRoundPreset: Codable, Hashable {
+        var look: RoundLook
+        var savedAt: Date
     }
 
-    /// Sends the edited look to the widget. A look that is not a built-in preset also
-    /// becomes the custom preset; saving a built-in one leaves the custom preset alone.
-    func saveLook() {
-        savedLook = look
-        SharedStore.widgetLook = look
-        if WidgetPreset.matching(look) == nil {
+    /// The line the round widget follows. `nil` is the first line shown.
+    @Published var roundLine: Station? {
+        didSet { SharedStore.roundLine = roundLine; reloadWidgets() }
+    }
+
+    var hasUnsavedLook: Bool { look != savedLook || roundLook != savedRoundLook }
+
+    /// Drops the edits not yet saved: the previews go back to what the widgets show.
+    func revertLook() {
+        look = savedLook
+        roundLook = savedRoundLook
+    }
+
+    /// A look that is not a built-in preset becomes that shape's custom preset as soon as
+    /// it is made, so moving on to another preset does not lose it.
+    private func rememberCustom() {
+        if WidgetPreset.matching(look) == nil, customPreset?.look != look {
             customPreset = CustomPreset(look: look, savedAt: Date())
             if let data = try? JSONEncoder().encode(customPreset) {
                 UserDefaults.standard.set(data, forKey: "customWidgetPreset")
             }
         }
+        if RoundPreset.matching(roundLook) == nil, customRoundPreset?.look != roundLook {
+            customRoundPreset = CustomRoundPreset(look: roundLook, savedAt: Date())
+            if let data = try? JSONEncoder().encode(customRoundPreset) {
+                UserDefaults.standard.set(data, forKey: "customRoundPreset")
+            }
+        }
+    }
+
+    /// Sends the edited looks to the widgets.
+    func saveLook() {
+        savedLook = look
+        savedRoundLook = roundLook
+        SharedStore.widgetLook = look
+        SharedStore.roundLook = roundLook
         reloadWidgets()
     }
 
@@ -172,7 +205,12 @@ final class AppModel: ObservableObject {
         textSizeStep = UserDefaults.standard.object(forKey: "textSizeStep") as? Int ?? AppModel.defaultTextSizeStep
         look = SharedStore.widgetLook
         savedLook = SharedStore.widgetLook
+        // The one custom look older builds kept is the rectangle's.
         customPreset = UserDefaults.standard.data(forKey: "customWidgetPreset").flatMap { try? JSONDecoder().decode(CustomPreset.self, from: $0) }
+        roundLook = SharedStore.roundLook
+        savedRoundLook = SharedStore.roundLook
+        customRoundPreset = UserDefaults.standard.data(forKey: "customRoundPreset").flatMap { try? JSONDecoder().decode(CustomRoundPreset.self, from: $0) }
+        roundLine = SharedStore.roundLine
         hiddenColumns = Set((UserDefaults.standard.stringArray(forKey: "hiddenColumns") ?? []).compactMap(Station.init(rawValue:)))
         showsPeriod = UserDefaults.standard.object(forKey: "showsPeriod") as? Bool ?? true
         foldedSections = Set(UserDefaults.standard.stringArray(forKey: "foldedSections") ?? [])
@@ -282,7 +320,7 @@ final class AppModel: ObservableObject {
     func restoreDefaults() {
         SharedStore.restoreDefaults()
         Guide.showAllAgain()
-        for key in ["textSizeStep", "customWidgetPreset", "hiddenColumns", "showsPeriod", "foldedSections", "dismissedBanners"] {
+        for key in ["textSizeStep", "customWidgetPreset", "customRoundPreset", "hiddenColumns", "showsPeriod", "foldedSections", "dismissedBanners"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
         manualStation = SharedStore.manualStation
@@ -290,6 +328,10 @@ final class AppModel: ObservableObject {
         look = SharedStore.widgetLook
         savedLook = SharedStore.widgetLook
         customPreset = nil
+        roundLook = SharedStore.roundLook
+        savedRoundLook = SharedStore.roundLook
+        customRoundPreset = nil
+        roundLine = nil
         hiddenColumns = []
         showsPeriod = true
         foldedSections = []
@@ -367,7 +409,7 @@ final class AppModel: ObservableObject {
     }
 
     private func reloadWidgets() {
-        WidgetCenter.shared.reloadTimelines(ofKind: SharedStore.widgetKind)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: Background refresh
@@ -390,6 +432,6 @@ final class AppModel: ObservableObject {
             log.merge(alerts: alerts, now: Date())
             log.save()
         }
-        WidgetCenter.shared.reloadTimelines(ofKind: SharedStore.widgetKind)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

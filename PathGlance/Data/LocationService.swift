@@ -74,7 +74,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         SharedStore.setAutoStation(newStation)
         station = newStation
         if changed {
-            WidgetCenter.shared.reloadTimelines(ofKind: SharedStore.widgetKind)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 

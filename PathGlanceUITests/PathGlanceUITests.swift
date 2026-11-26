@@ -46,8 +46,8 @@ final class PathGlanceUITests: XCTestCase {
 
     /// On the Widget tab the options scroll under the pinned preview and the tab bar, and a
     /// row behind either still counts as hittable. Drag until it is in the clear between them.
-    private func revealBelowPreview(_ element: XCUIElement) {
-        let preview = app.descendants(matching: .any)["lockScreenPreview"].firstMatch
+    private func revealBelowPreview(_ element: XCUIElement, preview name: String = "lockScreenPreview") {
+        let preview = app.descendants(matching: .any)[name].firstMatch
         let tabBarTop = app.buttons["tab-trains"].frame.minY
         let middle = (preview.frame.maxY + tabBarTop) / 2
         for _ in 0..<12 {
@@ -282,49 +282,86 @@ final class PathGlanceUITests: XCTestCase {
 
     func testWidgetLookIsEditedThenSaved() {
         launch(tab: "widget")
-        XCTAssertTrue(app.buttons["presetsRow"].waitForExistence(timeout: 30))
-        shot("09-widget-tab")
+        let picker = app.descendants(matching: .any)["shapePicker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 30))
         let save = app.buttons["saveLook"]
+        func preset(_ id: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(identifier: "preset-\(id)").firstMatch
+        }
+        XCTAssertTrue(preset("default").waitForExistence(timeout: 10))
+        let carousel = app.descendants(matching: .any)["lockScreenPreview"].firstMatch
+        // An earlier run that failed may have left another preset saved.
+        func backToDefault() {
+            for _ in 0..<12 where !preset("custom").isSelected && !preset("default").isSelected { carousel.swipeRight() }
+            if preset("custom").isSelected { carousel.swipeLeft() }
+            expectSelected(preset("default"))
+            if save.waitForExistence(timeout: 2) { save.tap() }
+            XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        }
+        backToDefault()
+        shot("09-widget-tab")
 
-        // A preset changes the preview and offers Save; saving hides the button.
-        app.buttons["presetsRow"].tap()
-        let large = app.buttons["preset-large"]
-        XCTAssertTrue(large.waitForExistence(timeout: 5))
+        // Tapping a neighbour in the carousel chooses it and offers Save; Cancel puts it back.
+        preset("packed").tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "Choosing another preset should offer Save")
+        XCTAssertTrue(preset("large").waitForExistence(timeout: 5))
+        preset("large").tap()
+        expectSelected(preset("large"))
         shot("10-presets")
-        // A custom look left by an earlier run is listed first and pushes Large down.
-        reveal(large)
-        large.tap()
-        XCTAssertTrue(save.waitForExistence(timeout: 5), "Choosing another look should offer Save")
-        // Cancel puts the look back and takes both buttons away.
         app.buttons["cancelLook"].tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Cancel should revert to the saved look")
-        app.buttons["presetsRow"].tap()
-        XCTAssertTrue(large.waitForExistence(timeout: 5))
-        reveal(large)
-        large.tap()
+        expectSelected(preset("default"))
+
+        // A swipe on the carousel moves one preset on, and Save sends it to the widget.
+        carousel.swipeLeft()
+        expectSelected(preset("packed"))
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
 
-        // Editing it makes it a custom look, which Save keeps as the custom preset.
-        let serif = app.buttons["font-condensed"]
-        reveal(serif)
+        // Editing it makes it the custom look, which takes the first card.
+        let serif = app.buttons["font-serif"]
+        revealBelowPreview(serif)
         serif.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5))
+        expectSelected(preset("custom"))
         save.tap()
-        for _ in 0..<4 where !app.buttons["presetsRow"].isHittable { app.swipeDown() }
-        app.buttons["presetsRow"].tap()
-        let custom = app.buttons["preset-custom"]
-        reveal(custom)
-        XCTAssertTrue(custom.waitForExistence(timeout: 5), "A saved custom look should be listed")
-        XCTAssertTrue(custom.isSelected)
         shot("11-custom-preset")
 
-        // Back to the default for later runs.
-        for _ in 0..<4 where !app.buttons["preset-default"].isHittable { app.swipeDown() }
-        app.buttons["preset-default"].tap()
+        // The Round tab has its own presets and its own custom look.
+        picker.buttons["Round widget"].tap()
+        XCTAssertTrue(preset("round-minutes").waitForExistence(timeout: 5))
+        shot("12-round-tab")
+        preset("round-clock").tap()
+        expectSelected(preset("round-clock"))
         XCTAssertTrue(save.waitForExistence(timeout: 5))
-        save.tap()
+        shot("13-round-clock")
+        let roundSerif = app.buttons["roundFont-serif"]
+        revealBelowPreview(roundSerif, preview: "roundPreview")
+        roundSerif.tap()
+        expectSelected(preset("round-custom"))
+        shot("14-round-custom")
+        app.buttons["cancelLook"].tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        expectSelected(preset("round-minutes"))
+
+        // A swipe under the carousel goes back to the rectangle.
+        let low = app.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.7))
+        low.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7)))
+        XCTAssertTrue(picker.buttons["Rectangle widget"].waitForExistence(timeout: 5))
+        let rectangle = picker.buttons["Rectangle widget"]
+        let selected = NSPredicate(format: "isSelected == true")
+        wait(for: [XCTNSPredicateExpectation(predicate: selected, object: rectangle)], timeout: 5)
+
+        // Back to the default for later runs.
+        backToDefault()
+    }
+
+    /// Waits for a carousel card to become the chosen one.
+    private func expectSelected(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let selected = NSPredicate(format: "isSelected == true")
+        let result = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: selected, object: element)], timeout: 6)
+        XCTAssertEqual(result, .completed, "\(element) should be the chosen preset", file: file, line: line)
     }
 
     func testSettingsSheetDragsUpAndDownAndRestoresDefaults() {
@@ -438,7 +475,7 @@ final class PathGlanceUITests: XCTestCase {
 
     func testHidingALineIsExplainedFirst() {
         launch(tab: "widget")
-        let newark = app.buttons["line-newark"]
+        let newark = app.buttons["line-newark"].firstMatch
         XCTAssertTrue(newark.waitForExistence(timeout: 30))
         revealBelowPreview(newark)
         if !newark.isSelected {
