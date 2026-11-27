@@ -45,7 +45,10 @@ private struct AppSheetModifier<Item: Identifiable, SheetContent: View>: ViewMod
 
     func body(content: Content) -> some View {
         content
-            .accessibilityHidden(item != nil)
+            // A popup leaves what is under it alone: its card is modal, which is enough for
+            // VoiceOver. Hiding the screen here as well, on top of a sheet that has already
+            // hidden its own, left controls under both with the whole screen as their frame.
+            .accessibilityHidden(item != nil && style == .sheet)
             .overlay {
                 ZStack {
                     if let item {

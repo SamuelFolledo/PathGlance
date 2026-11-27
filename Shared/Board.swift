@@ -27,10 +27,16 @@ struct BoardLine: Hashable, Sendable {
     /// When the first train reaches `target`, if the widget is set to show it.
     var arrival: Date?
     var timeFormat: WidgetTimeFormat = .full
+    /// "7:16 PM, 7:30": AM or PM after the line's first time.
+    var showsPeriod = false
+    /// No space after the commas, to fit one more train.
+    var compress = false
 
     /// "7:16, 7:30, 7:50" or "7:16 :30 :50". With the first train's arrival time:
     /// "7:16→7:35, 7:30".
-    var timesText: String { CompactTimes.string(times, arrivalOfFirst: arrival, format: timeFormat) }
+    var timesText: String {
+        CompactTimes.string(times, arrivalOfFirst: arrival, format: timeFormat, showsPeriod: showsPeriod, compress: compress)
+    }
 
     /// "33rd? 7:16 :30 :50 8:00 :10"
     var text: String {
@@ -51,6 +57,8 @@ struct BoardRow: Hashable, Sendable {
     var times: [Date]
     var arrival: Date?
     var timeFormat: WidgetTimeFormat = .full
+    var showsPeriod = false
+    var compress = false
 }
 
 struct Board: Hashable, Sendable {
@@ -74,15 +82,17 @@ struct Board: Hashable, Sendable {
         if rows.count == 1, let row = rows.first {
             let first = Array(row.times.prefix(count))
             let second = Array(row.times.dropFirst(count).prefix(count))
-            var lines = [BoardLine(label: row.label, times: first, delay: row.delay, target: row.target, arrival: row.arrival, timeFormat: row.timeFormat)]
+            var lines = [BoardLine(label: row.label, times: first, delay: row.delay, target: row.target, arrival: row.arrival,
+                                   timeFormat: row.timeFormat, showsPeriod: row.showsPeriod, compress: row.compress)]
             if !second.isEmpty {
-                lines.append(BoardLine(label: "", times: second, target: row.target, timeFormat: row.timeFormat))
+                lines.append(BoardLine(label: "", times: second, target: row.target, timeFormat: row.timeFormat,
+                                       showsPeriod: row.showsPeriod, compress: row.compress))
             }
             return lines
         }
         return rows.map { row in
             BoardLine(label: row.label, times: Array(row.times.prefix(count)), delay: row.delay, target: row.target,
-                      arrival: row.arrival, timeFormat: row.timeFormat)
+                      arrival: row.arrival, timeFormat: row.timeFormat, showsPeriod: row.showsPeriod, compress: row.compress)
         }
     }
 
@@ -186,6 +196,18 @@ struct WidgetStyle: Hashable, Codable, Sendable {
     var showArrival = false
     /// The most times a line may show. The widget shows fewer when fewer fit.
     var maxTimes = Board.mostPerLine
+    /// Each line starts from its second train: for a walk too long to catch the next one.
+    var skipNext = false
+    /// AM or PM after each line's first time.
+    var showsPeriod = false
+    /// Tighter letters and no space after the commas, to fit one more train.
+    var compress = false
+    /// The "From J Sq: 9:04 PM" row above the lines.
+    var showsHeader = true
+
+    enum CodingKeys: String, CodingKey {
+        case density, timeFormat, showArrival, maxTimes, skipNext, showsPeriod, compress, showsHeader
+    }
 
     /// Train times on each line where nothing measures what fits (VoiceOver, tests).
     var timesPerLine: Int {
@@ -195,6 +217,23 @@ struct WidgetStyle: Hashable, Codable, Sendable {
         case (.full, .compact): return 4
         case (.full, .regular): return 3
         }
+    }
+}
+
+extension WidgetStyle {
+    /// Every option is optional in the stored form, so a look saved before an option
+    /// existed still reads, with that option at its default.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        density = try values.decodeIfPresent(WidgetDensity.self, forKey: .density) ?? density
+        timeFormat = try values.decodeIfPresent(WidgetTimeFormat.self, forKey: .timeFormat) ?? timeFormat
+        showArrival = try values.decodeIfPresent(Bool.self, forKey: .showArrival) ?? showArrival
+        maxTimes = try values.decodeIfPresent(Int.self, forKey: .maxTimes) ?? maxTimes
+        skipNext = try values.decodeIfPresent(Bool.self, forKey: .skipNext) ?? skipNext
+        showsPeriod = try values.decodeIfPresent(Bool.self, forKey: .showsPeriod) ?? showsPeriod
+        compress = try values.decodeIfPresent(Bool.self, forKey: .compress) ?? compress
+        showsHeader = try values.decodeIfPresent(Bool.self, forKey: .showsHeader) ?? showsHeader
     }
 }
 
@@ -212,11 +251,24 @@ enum CompactTimes {
     }
 
     /// "7:10 :30 :50 8:00 :10". The hour is dropped when it repeats.
-    static func string(_ times: [Date], arrivalOfFirst: Date? = nil, format: WidgetTimeFormat = .short) -> String {
+    ///
+    /// `showsPeriod` puts AM or PM after the first time (after its arrival, when that is
+    /// shown) and again wherever a later time crosses noon or midnight. `compress` drops
+    /// the space after each comma of the full form.
+    static func string(_ times: [Date], arrivalOfFirst: Date? = nil, format: WidgetTimeFormat = .short,
+                       showsPeriod: Bool = false, compress: Bool = false) -> String {
+        var lastPeriod: String?
+        /// " PM" where the period should be said: at the start, and where it changes.
+        func period(_ time: Date) -> String {
+            guard showsPeriod else { return "" }
+            let name = PathTime.calendar.component(.hour, from: time) < 12 ? "AM" : "PM"
+            defer { lastPeriod = name }
+            return name == lastPeriod ? "" : " \(name)"
+        }
         if format == .full {
             return times.enumerated().map { index, time in
-                index == 0 ? clock(time) + (arrivalOfFirst.map { "→" + clock($0) } ?? "") : clock(time)
-            }.joined(separator: ", ")
+                (index == 0 ? clock(time) + (arrivalOfFirst.map { "→" + clock($0) } ?? "") : clock(time)) + period(time)
+            }.joined(separator: compress ? "," : ", ")
         }
         var parts: [String] = []
         var lastHour: Int?
@@ -232,7 +284,7 @@ enum CompactTimes {
             if index == 0, let arrivalOfFirst {
                 part += "→" + short(arrivalOfFirst)
             }
-            parts.append(part)
+            parts.append(part + period(time))
         }
         return parts.joined(separator: " ")
     }
@@ -361,7 +413,9 @@ struct BoardPlan: Sendable {
         let upcoming = groups
             .map { group -> Group in
                 var copy = group
-                copy.trains = group.trains.filter { $0.time > visibleFrom }
+                let trains = group.trains.filter { $0.time > visibleFrom }
+                // The last train of the night still shows: nothing follows it to skip to.
+                copy.trains = style.skipNext && trains.count > 1 ? Array(trains.dropFirst()) : trains
                 return copy
             }
             .filter { !$0.trains.isEmpty }
@@ -372,7 +426,8 @@ struct BoardPlan: Sendable {
 
         func row(_ group: Group, label: String? = nil, delay: DelayLevel? = nil, count: Int) -> BoardRow {
             BoardRow(label: label ?? group.target.lineLabel, target: group.target, delay: delay ?? group.delay,
-                     times: group.trains.prefix(count).map(\.time), arrival: arrival(in: group), timeFormat: style.timeFormat)
+                     times: group.trains.prefix(count).map(\.time), arrival: arrival(in: group), timeFormat: style.timeFormat,
+                     showsPeriod: style.showsPeriod, compress: style.compress)
         }
 
         if upcoming.count >= 2 {

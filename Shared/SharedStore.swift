@@ -93,7 +93,8 @@ enum SharedStore {
     /// Every setting kept here, for "Restore defaults".
     static let preferenceKeys = ["manualStation", "useRealtime", "mutedIssueKinds", "favoriteStops", "hiddenTargets",
                                  "widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle",
-                                 "roundContent", "roundFont", "roundLine", "lineOrder"]
+                                 "widgetSkipNext", "widgetShowsPeriod", "widgetCompress", "widgetShowsHeader",
+                                 "roundContent", "roundFont", "roundSkipNext", "roundShowsPeriod", "roundLine", "lineOrder"]
 
     /// What "Restore defaults" can be told to leave alone.
     enum Kept: String, CaseIterable, Sendable {
@@ -105,7 +106,8 @@ enum SharedStore {
             case .favoriteStops: return ["favoriteStops"]
             case .mutedIssues: return ["mutedIssueKinds"]
             case .presets: return ["widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle",
-                                   "roundContent", "roundFont", "roundLine"]
+                                   "widgetSkipNext", "widgetShowsPeriod", "widgetCompress", "widgetShowsHeader",
+                                   "roundContent", "roundFont", "roundSkipNext", "roundShowsPeriod", "roundLine"]
             }
         }
     }
@@ -151,10 +153,18 @@ enum SharedStore {
                 density: defaults.string(forKey: "widgetDensity").flatMap(WidgetDensity.init(rawValue:)) ?? .compact,
                 timeFormat: defaults.string(forKey: "widgetTimeFormat").flatMap(WidgetTimeFormat.init(rawValue:)) ?? .full,
                 showArrival: defaults.bool(forKey: "showArrivalOnWidget"),
-                maxTimes: defaults.object(forKey: "widgetMaxTimes") as? Int ?? Board.mostPerLine
+                maxTimes: defaults.object(forKey: "widgetMaxTimes") as? Int ?? Board.mostPerLine,
+                skipNext: defaults.bool(forKey: "widgetSkipNext"),
+                showsPeriod: defaults.bool(forKey: "widgetShowsPeriod"),
+                compress: defaults.bool(forKey: "widgetCompress"),
+                showsHeader: defaults.object(forKey: "widgetShowsHeader") as? Bool ?? true
             )
         }
         set {
+            defaults.set(newValue.skipNext, forKey: "widgetSkipNext")
+            defaults.set(newValue.showsPeriod, forKey: "widgetShowsPeriod")
+            defaults.set(newValue.compress, forKey: "widgetCompress")
+            defaults.set(newValue.showsHeader, forKey: "widgetShowsHeader")
             defaults.set(newValue.density.rawValue, forKey: "widgetDensity")
             defaults.set(newValue.timeFormat.rawValue, forKey: "widgetTimeFormat")
             defaults.set(newValue.showArrival, forKey: "showArrivalOnWidget")
@@ -173,9 +183,13 @@ enum SharedStore {
     static var roundLook: RoundLook {
         get {
             RoundLook(content: defaults.string(forKey: "roundContent").flatMap(RoundContent.init(rawValue:)) ?? .minutes,
-                      font: defaults.string(forKey: "roundFont").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard)
+                      font: defaults.string(forKey: "roundFont").flatMap(WidgetFontStyle.init(rawValue:)) ?? .standard,
+                      skipNext: defaults.bool(forKey: "roundSkipNext"),
+                      showsPeriod: defaults.bool(forKey: "roundShowsPeriod"))
         }
         set {
+            defaults.set(newValue.skipNext, forKey: "roundSkipNext")
+            defaults.set(newValue.showsPeriod, forKey: "roundShowsPeriod")
             defaults.set(newValue.content.rawValue, forKey: "roundContent")
             defaults.set(newValue.font.rawValue, forKey: "roundFont")
         }

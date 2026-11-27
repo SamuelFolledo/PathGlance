@@ -7,6 +7,12 @@ enum AppTab: Hashable {
     case trains, issues, widget
 }
 
+/// How builds before per-preset edits stored their one custom look.
+struct OldCustomPreset<Look: Codable>: Codable {
+    var look: Look
+    var savedAt = Date()
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     nonisolated static let refreshTaskID = "com.samuelfolledo.PathGlance.refresh"
@@ -87,21 +93,25 @@ final class AppModel: ObservableObject {
     /// A question waiting for the user's answer (`ask`).
     @Published var guide: Guide?
 
+    /// The legend on the Widget tab has been closed with its X. It stays away until
+    /// "Restore defaults", or "Widget legend" under About, brings it back.
+    @Published var legendHidden: Bool {
+        didSet { UserDefaults.standard.set(legendHidden, forKey: "widgetLegendHidden") }
+    }
+
     // MARK: Widget look
 
     /// The look being edited in the Widget tab. The widget itself keeps `savedLook`
     /// until Save is tapped.
-    @Published var look: WidgetLook {
-        didSet { rememberCustom() }
-    }
+    @Published var look: WidgetLook
     /// What the widget is drawing with.
     @Published private(set) var savedLook: WidgetLook
-    /// The last look saved that was not one of the built-in presets.
-    @Published private(set) var customPreset: CustomPreset?
-
-    struct CustomPreset: Codable, Hashable {
-        var look: WidgetLook
-        var savedAt: Date
+    /// The rectangle preset showing in the carousel. The widget keeps `presets.selected`
+    /// until Save is tapped.
+    @Published private(set) var presetID: String
+    /// The rectangle preset the widget is on, and the edits saved to each preset.
+    @Published private(set) var presets: PresetBook<WidgetLook> {
+        didSet { AppModel.store(presets, id: "widgetPresetID", edits: "widgetPresetEdits") }
     }
 
     var fontStyle: WidgetFontStyle {
@@ -114,17 +124,12 @@ final class AppModel: ObservableObject {
         set { look.style = newValue }
     }
 
-    /// The round widget's look being edited, what its widget draws with, and the last
-    /// round look that was not a built-in preset. Each shape remembers its own custom look.
-    @Published var roundLook: RoundLook {
-        didSet { rememberCustom() }
-    }
+    /// The same four for the round widget. Each shape has its own presets and edits.
+    @Published var roundLook: RoundLook
     @Published private(set) var savedRoundLook: RoundLook
-    @Published private(set) var customRoundPreset: CustomRoundPreset?
-
-    struct CustomRoundPreset: Codable, Hashable {
-        var look: RoundLook
-        var savedAt: Date
+    @Published private(set) var roundPresetID: String
+    @Published private(set) var roundPresets: PresetBook<RoundLook> {
+        didSet { AppModel.store(roundPresets, id: "roundPresetID", edits: "roundPresetEdits") }
     }
 
     /// The line the round widget follows. `nil` is the first line shown.
@@ -132,38 +137,113 @@ final class AppModel: ObservableObject {
         didSet { SharedStore.roundLine = roundLine; reloadWidgets() }
     }
 
-    var hasUnsavedLook: Bool { look != savedLook || roundLook != savedRoundLook }
+    var hasUnsavedLook: Bool {
+        look != savedLook || roundLook != savedRoundLook || presetID != presets.selected || roundPresetID != roundPresets.selected
+    }
+
+    private static func store<Look>(_ book: PresetBook<Look>, id: String, edits: String) {
+        UserDefaults.standard.set(book.selected, forKey: id)
+        UserDefaults.standard.set(try? JSONEncoder().encode(book.edits), forKey: edits)
+    }
+
+    private static func storedEdits<Look: Codable>(_ key: String) -> [String: Look] {
+        UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode([String: Look].self, from: $0) } ?? [:]
+    }
+
+    /// The custom look an older build kept under `key`, wrapped with the date it was saved.
+    private static func oldCustom<Look: Codable>(_ key: String) -> Look? {
+        UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(OldCustomPreset<Look>.self, from: $0) }?.look
+    }
+
+    private static func builtInLook(_ id: String) -> WidgetLook {
+        WidgetPreset.builtIn.first { $0.id == id }?.look ?? WidgetLook()
+    }
+
+    private static func builtInRoundLook(_ id: String) -> RoundLook {
+        RoundPreset.builtIn.first { $0.id == id }?.look ?? RoundLook()
+    }
+
+    /// What a rectangle preset looks like now: the one in hand as it is being edited,
+    /// any other with the edits last saved to it.
+    func look(forPreset id: String) -> WidgetLook {
+        id == presetID ? look : presets.look(id, builtIn: AppModel.builtInLook(id))
+    }
+
+    func roundLook(forPreset id: String) -> RoundLook {
+        id == roundPresetID ? roundLook : roundPresets.look(id, builtIn: AppModel.builtInRoundLook(id))
+    }
+
+    /// Whether a preset differs from the way it is built.
+    func isEdited(preset id: String, shape: WidgetShape) -> Bool {
+        switch shape {
+        case .rectangle: return look(forPreset: id) != AppModel.builtInLook(id)
+        case .round: return roundLook(forPreset: id) != AppModel.builtInRoundLook(id)
+        }
+    }
+
+    /// Turns the carousel to another preset. Edits to the one left behind that were not
+    /// saved are dropped: it goes back to how it was last saved.
+    func selectPreset(_ id: String, shape: WidgetShape) {
+        switch shape {
+        case .rectangle:
+            guard id != presetID, WidgetPreset.builtIn.contains(where: { $0.id == id }) else { return }
+            presetID = id
+            look = presets.look(id, builtIn: AppModel.builtInLook(id))
+        case .round:
+            guard id != roundPresetID, RoundPreset.builtIn.contains(where: { $0.id == id }) else { return }
+            roundPresetID = id
+            roundLook = roundPresets.look(id, builtIn: AppModel.builtInRoundLook(id))
+        }
+    }
+
+    /// Whether the preset in hand has anything to restore.
+    func canRestorePreset(_ shape: WidgetShape) -> Bool {
+        isEdited(preset: shape == .rectangle ? presetID : roundPresetID, shape: shape)
+    }
+
+    /// Puts the preset in hand back to how it is built. Like any other edit, it reaches
+    /// the widget on Save and is undone by Cancel.
+    func restorePreset(_ shape: WidgetShape) {
+        switch shape {
+        case .rectangle: look = AppModel.builtInLook(presetID)
+        case .round: roundLook = AppModel.builtInRoundLook(roundPresetID)
+        }
+    }
 
     /// Drops the edits not yet saved: the previews go back to what the widgets show.
     func revertLook() {
+        presetID = presets.selected
         look = savedLook
+        roundPresetID = roundPresets.selected
         roundLook = savedRoundLook
     }
 
-    /// A look that is not a built-in preset becomes that shape's custom preset as soon as
-    /// it is made, so moving on to another preset does not lose it.
-    private func rememberCustom() {
-        if WidgetPreset.matching(look) == nil, customPreset?.look != look {
-            customPreset = CustomPreset(look: look, savedAt: Date())
-            if let data = try? JSONEncoder().encode(customPreset) {
-                UserDefaults.standard.set(data, forKey: "customWidgetPreset")
-            }
-        }
-        if RoundPreset.matching(roundLook) == nil, customRoundPreset?.look != roundLook {
-            customRoundPreset = CustomRoundPreset(look: roundLook, savedAt: Date())
-            if let data = try? JSONEncoder().encode(customRoundPreset) {
-                UserDefaults.standard.set(data, forKey: "customRoundPreset")
-            }
-        }
-    }
-
-    /// Sends the edited looks to the widgets.
+    /// Sends the edited looks to the widgets, and keeps each with its preset.
     func saveLook() {
+        presets.save(look, for: presetID, builtIn: AppModel.builtInLook(presetID))
+        roundPresets.save(roundLook, for: roundPresetID, builtIn: AppModel.builtInRoundLook(roundPresetID))
         savedLook = look
         savedRoundLook = roundLook
         SharedStore.widgetLook = look
         SharedStore.roundLook = roundLook
         reloadWidgets()
+    }
+
+    /// Reads both shapes' presets, taking over what an older build left: its look that
+    /// matches no preset, and its one custom look, become edits on the first preset.
+    private static func loadPresets() -> (rectangle: PresetBook<WidgetLook>, round: PresetBook<RoundLook>) {
+        let defaults = UserDefaults.standard
+        let rectangle = PresetBook.resolve(
+            saved: SharedStore.widgetLook, storedID: defaults.string(forKey: "widgetPresetID"), storedEdits: storedEdits("widgetPresetEdits"),
+            custom: oldCustom("customWidgetPreset"), builtIn: WidgetPreset.builtIn.map { (id: $0.id, look: $0.look) }, fallback: WidgetPreset.builtIn[0].id)
+        let round = PresetBook.resolve(
+            saved: SharedStore.roundLook, storedID: defaults.string(forKey: "roundPresetID"), storedEdits: storedEdits("roundPresetEdits"),
+            custom: oldCustom("customRoundPreset"), builtIn: RoundPreset.builtIn.map { (id: $0.id, look: $0.look) }, fallback: RoundPreset.builtIn[0].id)
+        defaults.removeObject(forKey: "customWidgetPreset")
+        defaults.removeObject(forKey: "customRoundPreset")
+        store(rectangle, id: "widgetPresetID", edits: "widgetPresetEdits")
+        store(round, id: "roundPresetID", edits: "roundPresetEdits")
+        return (rectangle, round)
     }
 
     // MARK: Train list preferences
@@ -235,11 +315,14 @@ final class AppModel: ObservableObject {
         textSizeOffset = min(max(offset, AppModel.textSizeOffsets.lowerBound), AppModel.textSizeOffsets.upperBound)
         look = SharedStore.widgetLook
         savedLook = SharedStore.widgetLook
-        // The one custom look older builds kept is the rectangle's.
-        customPreset = UserDefaults.standard.data(forKey: "customWidgetPreset").flatMap { try? JSONDecoder().decode(CustomPreset.self, from: $0) }
         roundLook = SharedStore.roundLook
         savedRoundLook = SharedStore.roundLook
-        customRoundPreset = UserDefaults.standard.data(forKey: "customRoundPreset").flatMap { try? JSONDecoder().decode(CustomRoundPreset.self, from: $0) }
+        let books = AppModel.loadPresets()
+        presets = books.rectangle
+        presetID = books.rectangle.selected
+        roundPresets = books.round
+        roundPresetID = books.round.selected
+        legendHidden = UserDefaults.standard.bool(forKey: "widgetLegendHidden")
         roundLine = SharedStore.roundLine
         hiddenColumns = Set((UserDefaults.standard.stringArray(forKey: "hiddenColumns") ?? []).compactMap(Station.init(rawValue:)))
         showsPeriod = UserDefaults.standard.object(forKey: "showsPeriod") as? Bool ?? true
@@ -347,6 +430,13 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Brings the legend on the Widget tab back, and the tab to its top so it is in view.
+    func showLegend() {
+        legendHidden = false
+        tab = .widget
+        resetCount[.widget, default: 0] += 1
+    }
+
     /// Shows the welcome note again, whether or not it has been silenced.
     func showWelcome() {
         guide = .welcome
@@ -358,8 +448,8 @@ final class AppModel: ObservableObject {
     func restoreDefaults(keeping kept: Set<SharedStore.Kept> = []) {
         SharedStore.restoreDefaults(keeping: kept)
         Guide.showAllAgain()
-        var keys = ["textSizeStep", "textSizeOffset", "showsPeriod", "foldedSections", "dismissedBanners", "askedForAlways"]
-        if !kept.contains(.presets) { keys += ["customWidgetPreset", "customRoundPreset"] }
+        var keys = ["textSizeStep", "textSizeOffset", "showsPeriod", "foldedSections", "dismissedBanners", "askedForAlways", "widgetLegendHidden"]
+        if !kept.contains(.presets) { keys += ["widgetPresetID", "widgetPresetEdits", "roundPresetID", "roundPresetEdits"] }
         if !kept.contains(.favoriteStops) { keys.append("hiddenColumns") }
         for key in keys {
             UserDefaults.standard.removeObject(forKey: key)
@@ -372,9 +462,12 @@ final class AppModel: ObservableObject {
         savedRoundLook = SharedStore.roundLook
         roundLine = SharedStore.roundLine
         if !kept.contains(.presets) {
-            customPreset = nil
-            customRoundPreset = nil
+            presets = PresetBook(selected: WidgetPreset.builtIn[0].id)
+            roundPresets = PresetBook(selected: RoundPreset.builtIn[0].id)
         }
+        presetID = presets.selected
+        roundPresetID = roundPresets.selected
+        legendHidden = false
         if !kept.contains(.favoriteStops) { hiddenColumns = [] }
         showsPeriod = true
         foldedSections = AppModel.defaultFoldedSections

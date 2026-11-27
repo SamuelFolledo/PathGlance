@@ -15,6 +15,11 @@ Add a line here in the same change that rewrites the owning doc. A choice made f
 - Restore defaults asks what to keep: favorite stops, muted issues, lock screen presets. All three boxes start unticked every time. Built. → [Welcome note and guides](app/welcome-and-guides.md)
 - "Learned day types" is hidden until there is something in it. "Timetables" is folded into Schedule and only listed when there is more than one. Schedule's rows are "Last updated" and "Schedule". Built. → [Widget](app/widget.md#settings-sheet)
 - Issue sheet brought to the DA drawing: no subtitle, no sort row, no bell beside the X; the time PATH puts in front of its text is dropped, since the rail shows it; the day shows only when it is not today. Built. → [Issues](app/issues.md)
+- No Custom preset: an edit changes the preset in hand, and Save keeps it with that preset, which then reads "Edited". Turning to another preset drops what was not saved. "Restore preset" at the bottom puts one back as built. An older custom look becomes edits on Default or Minutes. Built. → [Widget](app/widget.md#preview-and-presets)
+- Widget tab sections: "Times" is "Time format" and holds only the two radio rows. A new "Show" section holds trains per line and arrival time, plus Skip the next train, AM and PM, Compress more and From station. Round gets Show with the two that apply. Built. → [Widget](app/widget.md#look-settings)
+- Turning "From station" off is explained first (`hide-widget-header` guide, can be silenced). Built. → [Welcome note and guides](app/welcome-and-guides.md)
+- A grey legend under the widget preview says what each mark means, one per page, in the issue banner's shape. Its X closes it for good; "Widget legend" under About brings it back. Built. → [Widget](app/widget.md#legend)
+- Fixed: Settings could not be opened again after a guide had been shown from inside it. → [UI](shared/ui.md)
 - **The owner has not seen this one yet:** the app still draws one step above the phone's text size at "Standard", because that is the size every screen was designed and approved at. → [Widget](app/widget.md#open-questions)
 
 ## 2026-11-26

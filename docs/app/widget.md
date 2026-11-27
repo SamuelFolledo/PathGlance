@@ -1,13 +1,13 @@
 # Widget and Settings
 
-> **Where:** third tab; Settings is the sheet behind its menu button · **Code:** `WidgetView`, `SettingsSheet` (`PathGlance/Features/Widget/WidgetView.swift`), `LinesShownRows`, `FavoriteStopsView` (`Sheets/OptionViews.swift`), `WidgetPreviewCard`, `RoundPreviewCard`, `PreviewFeed` · widgets: `PathGlanceWidget/PathGlanceWidget.swift` · data: `WidgetLook`, `WidgetPreset` (`Shared/WidgetSupport.swift`), `WidgetShape`, `RoundLook`, `RoundPreset`, `RoundFace` (`Shared/RoundWidget.swift`), `WidgetStyle` (`Shared/Board.swift`)
+> **Where:** third tab; Settings is the sheet behind its menu button · **Code:** `WidgetView`, `SettingsSheet` (`PathGlance/Features/Widget/WidgetView.swift`), `LinesShownRows`, `FavoriteStopsView` (`Sheets/OptionViews.swift`), `WidgetPreviewCard`, `RoundPreviewCard`, `PreviewFeed` · widgets: `PathGlanceWidget/PathGlanceWidget.swift` · data: `WidgetLook`, `WidgetPreset` (`Shared/WidgetSupport.swift`), `WidgetShape`, `RoundLook`, `RoundPreset`, `RoundFace` (`Shared/RoundWidget.swift`), `WidgetStyle` (`Shared/Board.swift`), `PresetBook` (`PathGlance/Data/PresetBook.swift`)
 
 ## Summary
 
 - There are two lock screen widgets: **Rectangle**, which takes two slots, and **Round**, which takes one. iOS offers nothing wider than the rectangle. (decided 2026-11-26)
 - The tab shows each as it will look, and everything that changes it. Underline tabs under the title pick the shape.
 - Edits show in the preview at once but only reach the real widgets on **Save**; **Cancel** sits beside it. One Save sends both shapes.
-- A preset is a ready-made look. Changing anything after choosing one makes it that shape's custom look.
+- A preset is a ready-made look. Changing anything changes the preset in hand, and Save keeps the change with that preset. There is no separate custom look. (2026-11-27)
 - Everything that is not about the widgets' look is in the Settings sheet.
 
 ## Title and menu button
@@ -24,7 +24,10 @@ The preview is a carousel of the shape's presets (`Carousel`, see [UI](../shared
 
 - **Each card is the widget itself**, drawn by the widget's own view at its real size and enlarged, with live times. All cards read one `PreviewFeed`, so the live feed is fetched once.
 - **The chosen rectangle card behaves like the widget:** the top row refreshes, a line opens that destination's trains. Neighbours are pictures.
-- **Custom is the first card of each carousel.** A look that matches no built-in preset becomes that shape's custom look the moment it is made, before Save, so moving on to another preset does not lose it. Each shape remembers one (`customWidgetPreset`, `customRoundPreset`). The single custom look older builds kept is the rectangle's. Until there is one, the card says "Change any option below and your own look is kept here."
+- **Edits stay with their preset.** An option changed while a preset is in the middle changes that preset: the card stays where it is and its name gains "· Edited". Save sends it to the widget and keeps it with the preset (`PresetBook.edits`, by preset id, one book per shape). A preset back at its built-in values has no entry. (decided 2026-11-27, replacing the Custom card of 2026-11-26)
+- **Turning to another preset drops what was not saved** on the one left behind, with no question asked. Edits that were saved wait with their preset and show again when it is turned back to.
+- **Restore preset**, the last row under each shape's settings, puts the preset in hand back to its built-in values. It is an edit like any other: the preview shows it at once, Save sends it, Cancel undoes it. It is greyed out when the preset has nothing to restore.
+- **Taking over from older builds** (`PresetBook.resolve`): a saved look that matches no preset becomes edits on the first preset of its shape (Default, Minutes). The spare custom look those builds kept does too, unless the first preset is the one in use as built: what the widget shows is kept. The old keys (`customWidgetPreset`, `customRoundPreset`) are read once and removed.
 - **Pinned:** the carousel stays under the tabs while the settings scroll beneath; a phone on its side has too little height for that, so there it scrolls with the rest. (decided 2026-11-23)
 - **Station names are heavier than times:** the station in the header ("From **J Sq**: 9:04 PM") and each line's destination with its delay mark ("**33rd?**") are bold; the times stay medium (`WidgetFontStyle.nameWeight`, `BoardLine.nameLength`). It applies to both widgets, the previews and every preset. The lock screen keeps weights but not colours, which is why this is done with weight. (decided 2026-11-25)
 
@@ -66,12 +69,32 @@ Rectangle:
 
 - **Font:** Standard, Rounded, Monospaced, Condensed, Serif (`WidgetFontStyle`). Sets the typeface of the whole widget.
 - **Size:** Compact ("Smaller text, more trains") or Regular ("Larger text, fewer trains"). The text is never shrunk to fit: larger text simply shows fewer trains.
-- **Times:** Full ("10:16, 10:35, 10:55") or Shortened ("10:16 :35 :55"); a stepper for the most trains per line; a check for "Arrival time of the next train" (shown as 7:16→7:35).
+- **Time format** (was "Times"): Full ("10:16, 10:35, 10:55") or Shortened ("10:16 :35 :55"). Only the two radio rows. (2026-11-27)
+- **Show:** what the lines carry, each its own row. (2026-11-27)
+	- A stepper for the most trains per line.
+	- **Arrival time of the next train**, shown as 7:16→7:35.
+	- **Skip the next train:** each line starts from its second train, for a walk too long to catch the next one. A line down to its last train still shows it. Off by default.
+	- **AM and PM:** after each line's first time, and again where the times cross noon or midnight ("11:50 AM, 12:05 PM, 12:20"). With an arrival it follows the arrival ("7:16→7:35 AM"). Off by default.
+	- **Compress more:** the letters sit closer and the space after each comma goes, which often fits one more train. Off by default.
+	- **From station:** the top row ("From J Sq: 9:04 PM"). On by default. Turning it off raises the `hide-widget-header` guide first, because the last-updated time, the refresh tap and the alert mark are on that row and go with it.
+- **Restore preset**, described above.
 
 Round:
 
 - **Font:** the same five.
-- **Line:** "First line shown", or one destination for the circle to follow. At a station that line does not leave from, it follows the first line shown. It is not part of the look: it takes effect at once, without Save, and does not make a preset custom.
+- **Line:** "First line shown", or one destination for the circle to follow. At a station that line does not leave from, it follows the first line shown. It is not part of the look: it takes effect at once, without Save, and does not count as an edit to a preset.
+- **Show:** "Skip the next train", and "AM and PM", which only shows on a preset that draws a clock time (Clock time). (2026-11-27)
+- **Restore preset.**
+
+All of Show is part of the look (`WidgetStyle`, `RoundLook`), so it is saved with the preset in hand. A look saved before an option existed still reads, with that option at its default.
+
+## Legend
+
+A grey strip under the carousel, above the settings, saying what each mark in the widget means, one mark per page: swipe sideways, dots under it. It is the issue banner (`IssueBannerStack`, see [UI](../shared/ui.md)) with nothing to open. (2026-11-27)
+
+- **Rectangle:** the top row and its time; ? and ! after a line; the warning triangle; the arrival arrow; bold names.
+- **Round:** Now, minutes and clock times; ? and !; the ring; bold names.
+- **The X closes the whole legend for good**, on both shapes. "Widget legend" under About in Settings brings it back and returns to the Widget tab; so does Restore defaults.
 
 ## The widgets themselves
 
@@ -95,7 +118,7 @@ Opened by the menu button (`SettingsSheet`). Groups, top to bottom:
 - **Text size:** the app follows the phone's text size. The slider moves it up to three steps either way from there, and "Back to standard" returns to following it (`AppModel.textSize(system:offset:)`). It stops at the smallest and largest sizes the layouts are made for. The widgets have their own Size. (2026-11-27)
 - **Learned day types:** which timetable PATH really ran on each day, worked out by the widget from live arrivals. Hidden until there is at least one day in it. (2026-11-27)
 - **Support the app:** Buy Me a Coffee, PayPal, Venmo, Cash App. Each opens outside the app; nothing is locked behind a tip. (decided 2026-11-23)
-- **About:** Email the developer, Report a problem, Share, Help, Privacy policy, Welcome note, then one block of text with the version, the developer and the not-affiliated disclaimer (`AppInfo`).
+- **About:** Email the developer, Report a problem, Share, Help, Privacy policy, Welcome note, Widget legend, then one block of text with the version, the developer and the not-affiliated disclaimer (`AppInfo`).
 - **Restore defaults:** always asks (`restore-defaults` guide, cannot be silenced), with three boxes for what to keep: favorite stops, muted issues, lock screen presets. All start unticked each time. (2026-11-27)
 
 The sheet has no subtitle under its title, and no row that is only text: what a row is set to sits on a second line under its title (`DetailRow`). (2026-11-27)
@@ -104,5 +127,9 @@ The sheet has no subtitle under its title, and no row that is only text: what a 
 
 - **Text size at "Standard":** the app draws one step above the phone's own size, because every screen was designed and approved at that size. The owner has not been asked whether "Standard" should be exactly the phone's size.
 - **Round presets' fonts and pairings** with the rectangle presets, as drawn on the design page's Review tab.
+- **Hiding the station row frees no room for the lines:** they stay two lines at the same size, with the space above them empty. The owner was told it "gives the lines more room"; that is not what was built.
+- **AM and PM is said once per line**, not after every time, to keep room for trains. The owner asked for it "on the train times" and has not seen this reading.
+- **"Compress more"** is read as closer letters and no space after commas.
+- **More toggles suggested, not built:** see [`ideas.md`](../ideas.md).
 - **The eleven rectangle presets** still wait for approval.
 - **Not seen on a real lock screen:** the round widget has only been drawn in the app's preview.

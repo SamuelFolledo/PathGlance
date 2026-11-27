@@ -62,9 +62,18 @@ Open work, in one list. No tickets, no board.
 - [ ] Ask the owner whether "Standard" text size should be exactly the phone's size; today it is one step above (2026-11-27)
 - [ ] Check large accessibility sizes above accessibility1; the app stops there (2026-11-27)
 
+## Widget tab, feedback of 2026-11-27
+
+- [x] Edits stay with their preset and Custom is gone; Restore preset; "Time format" and "Show" sections with Skip the next train, AM and PM, Compress more and From station; the legend under the preview (2026-11-27)
+- [ ] Owner to confirm three readings: AM and PM once per line, not after every time; "Compress more" as closer letters and no space after commas; hiding the station row leaves the freed height empty (2026-11-27)
+- [ ] Owner to pick from the suggested Show toggles in [`ideas.md`](ideas.md) (2026-11-27)
+- [ ] See both widgets on a real lock screen with each new option on (2026-11-27)
+
 ## Bugs found, not fixed
 
-- [ ] Settings does not open again once a guide has been shown from inside it and closed (seen with Restore defaults > Cancel and with the hide-line guide, in UI tests; the same happens on the commit before these changes). Relaunching clears it. Not yet tried by hand (2026-11-27)
+- [x] Settings does not open again once a guide has been shown from inside it and closed (seen with Restore defaults > Cancel and with the hide-line guide, in UI tests; the same happens on the commit before these changes). Relaunching clears it. Not yet tried by hand (2026-11-27)
+	- Found and fixed. The button worked; what broke was its accessibility frame, which became the whole screen, so a UI test (and VoiceOver's focus) aimed at the middle of the screen. A popup hid the screen under it from accessibility on top of a sheet that had already hidden its own. A popup now relies on being modal and hides nothing; `testSettingsOpensAgainAfterAGuide` covers it (2026-11-27)
+- [ ] `testFavoriteStopAddsAColumn` failed once in a full run at about 5:20 AM ("originMenu" not found right after launch) and passed alone; `testHeaderGivesWayToTheDateWhenScrolled` failed in the run and alone at that hour. Both look like the early-morning scroll problem below; not chased (2026-11-27)
 - [ ] Around 4 AM, at the largest text size, a short scroll on the train list lands on yesterday afternoon. `testHeaderGivesWayToTheDateWhenScrolled` fails on it at that hour. A guess, not checked: rows of the day before are laid out lazily above the first train of the day, and their real heights shift the list as they load (2026-11-27)
 
 ## Tests

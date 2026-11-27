@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// One card of a preset carousel. `look` is `nil` for a Custom card nothing has filled yet.
+/// One card of a preset carousel.
 private struct PresetCard<Look>: Identifiable {
     let id: String
     let name: String
-    let look: Look?
-
-    static var customID: String { "custom" }
+    let look: Look
+    /// It differs from the way the preset is built.
+    let isEdited: Bool
 }
 
 /// The Widget tab: both lock screen widgets as they will look, and everything that
 /// changes them. Underline tabs pick the shape; under them the preview is a carousel of
-/// that shape's presets, with your own look first. Edits show in the preview at once but
-/// only reach the real widgets on Save. The menu button opens the settings that are not
+/// that shape's presets. Edits change the preset in hand, show in the preview at once, and
+/// reach the real widgets on Save, when they are also kept with that preset. The menu button opens the settings that are not
 /// about the widgets.
 struct WidgetView: View {
     @EnvironmentObject private var model: AppModel
@@ -121,6 +121,9 @@ struct WidgetView: View {
                     Color.clear
                         .frame(height: 0)
                         .id("top")
+                    if !model.legendHidden {
+                        legend(shape)
+                    }
                     switch shape {
                     case .rectangle: rectangleOptions
                     case .round: roundOptions
@@ -145,22 +148,60 @@ struct WidgetView: View {
         }
     }
 
+    // MARK: Legend
+
+    /// What each mark in the widgets means, a page per mark, in the banner the Trains
+    /// tab uses for issues. Its X puts the whole legend away for good.
+    private func legend(_ shape: WidgetShape) -> some View {
+        IssueBannerStack(items: WidgetView.legend(shape), dismissLabel: "Close the legend", name: "widgetLegend", noun: "Mark",
+                         subtitleLines: 3) { _ in
+            withAnimation(Theme.Motion.sheet) { model.legendHidden = true }
+        }
+        .infoPopover("Legend", "Swipe sideways for the next mark.", "The X closes it for good. Widget legend, under About in Settings, brings it back.")
+    }
+
+    /// The marks each widget can show, most often seen first.
+    static func legend(_ shape: WidgetShape) -> [IssueBannerItem] {
+        func item(_ id: String, _ symbol: String, _ title: String, _ subtitle: String) -> IssueBannerItem {
+            IssueBannerItem(id: "legend-\(id)", symbol: symbol, color: .gray, title: title, subtitle: subtitle, time: "")
+        }
+        let delay = item("delay", "questionmark", "33rd? and 33rd!",
+                         "A ? after a line is a short delay. A ! is a long delay, or an issue PATH has posted about that line.")
+        let bold = item("bold", "bold", "Bold names", "Stations and lines are bold, so the eye finds them before the times.")
+        switch shape {
+        case .rectangle:
+            return [
+                item("updated", "arrow.clockwise", "From J Sq: 9:04 PM",
+                     "Where the trains leave from and when the widget last read the times. Tap that row on the lock screen to refresh."),
+                delay,
+                item("alert", "exclamationmark.triangle.fill", "Warning triangle",
+                     "PATH has an open issue that names none of the lines shown. The Issues tab has it."),
+                item("arrival", "arrow.right", "7:16→7:35", "The first train leaves at 7:16 and reaches the end of its line at 7:35."),
+                bold,
+            ]
+        case .round:
+            return [
+                item("now", "clock", "Now, 4 min, 9:20",
+                     "Now is under a minute away. Minutes count down to the next train. Past an hour, it is the time the train leaves."),
+                delay,
+                item("ring", "circle.dashed", "The ring", "Full at twenty minutes or more, it empties as the train gets closer."),
+                bold,
+            ]
+        }
+    }
+
     // MARK: Carousels
 
     @ViewBuilder
     private func carousel(_ shape: WidgetShape) -> some View {
         switch shape {
         case .rectangle:
-            let cards = [PresetCard(id: PresetCard<WidgetLook>.customID, name: "Custom", look: model.customPreset?.look)]
-                + WidgetPreset.builtIn.map { PresetCard(id: $0.id, name: $0.name, look: $0.look) }
-            Carousel(items: cards, selection: rectangleSelection, peek: 44, noun: "Preset") { card, isSelected in
-                presetCard(card.name, id: card.id, isSelected: isSelected) {
-                    if let look = card.look {
-                        WidgetPreviewCard(look: look, isInteractive: isSelected, maxScale: 1.6)
-                    } else {
-                        emptyCustom
-                            .frame(height: WidgetPreviewCard.widgetSize.height * 1.6)
-                    }
+            let cards = WidgetPreset.builtIn.map {
+                PresetCard(id: $0.id, name: $0.name, look: model.look(forPreset: $0.id), isEdited: model.isEdited(preset: $0.id, shape: .rectangle))
+            }
+            Carousel(items: cards, selection: selection(.rectangle), peek: 44, noun: "Preset") { card, isSelected in
+                presetCard(card.name, id: card.id, isSelected: isSelected, isEdited: card.isEdited) {
+                    WidgetPreviewCard(look: card.look, isInteractive: isSelected, maxScale: 1.6)
                 }
             }
             .accessibilityElement(children: .contain)
@@ -168,55 +209,36 @@ struct WidgetView: View {
             .infoPopover("Lock screen preview",
                          "This is the widget at its real proportions, with live times. Swipe, or tap a neighbour, for another preset.",
                          "Tap the top row to refresh it. Tap a line to see those trains.",
-                         "A ? after a line means a short delay, ! a long one.")
+                         "Changes you save stay with the preset. Restore preset, at the bottom, undoes them.")
         case .round:
-            let cards = [PresetCard(id: PresetCard<RoundLook>.customID, name: "Custom", look: model.customRoundPreset?.look)]
-                + RoundPreset.builtIn.map { PresetCard(id: $0.id, name: $0.name, look: $0.look) }
-            Carousel(items: cards, selection: roundSelection, peek: max(44, (UIScreen.main.bounds.width - 168) / 2), noun: "Preset") { card, isSelected in
-                presetCard(card.name, id: "round-\(card.id)", isSelected: isSelected) {
-                    if let look = card.look {
-                        RoundPreviewCard(look: look)
-                    } else {
-                        emptyCustom
-                            .frame(height: RoundPreviewCard.widgetSize * 1.6)
-                    }
+            let cards = RoundPreset.builtIn.map {
+                PresetCard(id: $0.id, name: $0.name, look: model.roundLook(forPreset: $0.id), isEdited: model.isEdited(preset: $0.id, shape: .round))
+            }
+            Carousel(items: cards, selection: selection(.round), peek: max(44, (UIScreen.main.bounds.width - 168) / 2), noun: "Preset") { card, isSelected in
+                presetCard(card.name, id: "round-\(card.id)", isSelected: isSelected, isEdited: card.isEdited) {
+                    RoundPreviewCard(look: card.look)
                 }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("roundPreview")
             .infoPopover("Round widget preview",
                          "This is the one-slot widget at its real proportions. Swipe, or tap a neighbour, for another preset.",
-                         "It follows one line, chosen under Line.")
+                         "It follows one line, chosen under Line.",
+                         "Changes you save stay with the preset. Restore preset, at the bottom, undoes them.")
         }
     }
 
-    /// The preset matching the look being edited, or Custom when none does.
-    private var rectangleSelection: Binding<String> {
+    /// The preset in hand. Turning to another drops what was not saved on this one.
+    private func selection(_ shape: WidgetShape) -> Binding<String> {
         Binding {
-            WidgetPreset.matching(model.look)?.id ?? PresetCard<WidgetLook>.customID
+            shape == .rectangle ? model.presetID : model.roundPresetID
         } set: { id in
-            if let preset = WidgetPreset.builtIn.first(where: { $0.id == id }) {
-                model.look = preset.look
-            } else if let custom = model.customPreset {
-                model.look = custom.look
-            }
-        }
-    }
-
-    private var roundSelection: Binding<String> {
-        Binding {
-            RoundPreset.matching(model.roundLook)?.id ?? PresetCard<RoundLook>.customID
-        } set: { id in
-            if let preset = RoundPreset.builtIn.first(where: { $0.id == id }) {
-                model.roundLook = preset.look
-            } else if let custom = model.customRoundPreset {
-                model.roundLook = custom.look
-            }
+            model.selectPreset(id, shape: shape)
         }
     }
 
     /// A preview on a stand-in lock screen with the preset's name under it.
-    private func presetCard<Preview: View>(_ name: String, id: String, isSelected: Bool, @ViewBuilder preview: () -> Preview) -> some View {
+    private func presetCard<Preview: View>(_ name: String, id: String, isSelected: Bool, isEdited: Bool, @ViewBuilder preview: () -> Preview) -> some View {
         VStack(spacing: 6) {
             preview()
                 .padding(Theme.Spacing.md)
@@ -234,23 +256,15 @@ struct WidgetView: View {
                 }
                 .environment(\.colorScheme, .dark)
                 .accessibilityHidden(!isSelected)
-            Text(name)
+            Text(isEdited ? "\(name) · Edited" : name)
                 .font(.footnote.weight(isSelected ? .bold : .medium))
                 .foregroundStyle(isSelected ? AnyShapeStyle(Theme.Colors.brand) : AnyShapeStyle(.secondary))
                 .lineLimit(1)
+                .accessibilityLabel(isEdited ? "\(name), edited" : name)
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier("preset-\(id)")
         }
         .opacity(isSelected ? 1 : 0.6)
-    }
-
-    /// The Custom card before any look of your own exists.
-    private var emptyCustom: some View {
-        Text("Change any option below and your own look is kept here.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
     }
 
     // MARK: Options
@@ -291,7 +305,7 @@ struct WidgetView: View {
                 .accessibilityIdentifier("size-\(density.rawValue)")
             }
         }
-        FoldCard(id: "widget-times", title: "Times", value: model.widgetStyle.timeFormat.name) {
+        FoldCard(id: "widget-times", title: "Time format", value: model.widgetStyle.timeFormat.name) {
             ForEach(WidgetTimeFormat.allCases) { format in
                 RadioRow(isSelected: model.widgetStyle.timeFormat == format) {
                     model.widgetStyle.timeFormat = format
@@ -307,10 +321,13 @@ struct WidgetView: View {
                              format == .full ? "Every time is written out." : "The hour is dropped when it repeats, which fits more trains on each line.")
                 .accessibilityIdentifier("times-\(format.rawValue)")
             }
+        }
+        FoldCard(id: "widget-show", title: "Show", value: showSummary) {
             Stepper(value: $model.widgetStyle.maxTimes, in: 1...Board.mostPerLine) {
                 Text(model.widgetStyle.maxTimes >= Board.mostPerLine ? "As many trains as fit" : "Up to \(model.widgetStyle.maxTimes) trains per line")
             }
             .padding(.vertical, 6)
+            .overlay(alignment: .bottom) { Divider() }
             .accessibilityIdentifier("maxTimesStepper")
             .infoPopover("Trains per line",
                          "The most train times a line shows.",
@@ -323,7 +340,87 @@ struct WidgetView: View {
             }
             .infoPopover("Arrival time", "Adds when the first train on each line reaches its destination.", "Shown as 7:16→7:35.")
             .accessibilityIdentifier("showArrival")
+            CheckRow(isOn: model.widgetStyle.skipNext) {
+                model.widgetStyle.skipNext.toggle()
+            } label: {
+                Text("Skip the next train")
+            }
+            .infoPopover("Skip the next train", "Each line starts from its second train.", "For when the walk to the station is too long to catch the next one.", "The last train of the night still shows.")
+            .accessibilityIdentifier("skipNext")
+            CheckRow(isOn: model.widgetStyle.showsPeriod) {
+                model.widgetStyle.showsPeriod.toggle()
+            } label: {
+                Text("AM and PM")
+            }
+            .infoPopover("AM and PM", "Adds AM or PM after each line's first time.", "It shows again where the times cross noon or midnight.")
+            .accessibilityIdentifier("showsPeriod")
+            CheckRow(isOn: model.widgetStyle.compress) {
+                model.widgetStyle.compress.toggle()
+            } label: {
+                Text("Compress more")
+            }
+            .infoPopover("Compress more", "Sets the letters closer and drops the space after each comma.", "Often fits one more train on a line.")
+            .accessibilityIdentifier("compress")
+            CheckRow(isOn: model.widgetStyle.showsHeader) {
+                if model.widgetStyle.showsHeader {
+                    model.ask(WidgetView.hideHeaderGuide { model.widgetStyle.showsHeader = false })
+                } else {
+                    model.widgetStyle.showsHeader = true
+                }
+            } label: {
+                Text("From station")
+            }
+            .infoPopover("From station", "The top row: the station the trains leave from and when the widget last updated.", "Tapping that row on the lock screen refreshes the widget.")
+            .accessibilityIdentifier("showsHeader")
         }
+        restoreButton(.rectangle)
+    }
+
+    /// What the Show section is set to, for when it is folded.
+    private var showSummary: String {
+        let style = model.widgetStyle
+        var parts = [style.maxTimes >= Board.mostPerLine ? "All that fit" : "Up to \(style.maxTimes)"]
+        if style.showArrival { parts.append("arrival") }
+        if style.skipNext { parts.append("skip next") }
+        if style.showsPeriod { parts.append("AM/PM") }
+        if style.compress { parts.append("compressed") }
+        if !style.showsHeader { parts.append("no station") }
+        return parts.joined(separator: ", ")
+    }
+
+    /// Asked before the top row is hidden, since more than the station's name goes with it.
+    static func hideHeaderGuide(_ hide: @escaping () -> Void) -> Guide {
+        Guide(
+            id: "hide-widget-header",
+            title: "Hide the station row?",
+            points: [
+                "The widget will show only its train lines, with nothing above them.",
+                "This suits you if you always ride from the same station, or only care about certain lines.",
+                "The time it last updated, the refresh tap and the alert mark are on that row, so they go too.",
+                "Tick From station again to bring the row back.",
+            ],
+            confirm: "Hide",
+            action: hide
+        )
+    }
+
+    /// Puts the preset in hand back the way it is built.
+    private func restoreButton(_ shape: WidgetShape) -> some View {
+        let canRestore = model.canRestorePreset(shape)
+        return Button {
+            model.restorePreset(shape)
+        } label: {
+            Label("Restore preset", systemImage: "arrow.counterclockwise")
+                .frame(maxWidth: .infinity)
+                .padding(Theme.Spacing.contentSide)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(canRestore ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+        .card()
+        .disabled(!canRestore)
+        .accessibilityIdentifier(shape == .rectangle ? "restorePreset" : "restoreRoundPreset")
+        .infoPopover("Restore preset", "Puts this preset back the way it came, undoing your changes to it.", "Like any change, it reaches the widget when you tap Save.")
     }
 
     @ViewBuilder
@@ -368,6 +465,33 @@ struct WidgetView: View {
                 .accessibilityIdentifier("roundLine-\(station.rawValue)")
             }
         }
+        FoldCard(id: "round-show", title: "Show", value: roundShowSummary) {
+            CheckRow(isOn: model.roundLook.skipNext) {
+                model.roundLook.skipNext.toggle()
+            } label: {
+                Text("Skip the next train")
+            }
+            .infoPopover("Skip the next train", "The circle follows the line's second train.", "For when the walk to the station is too long to catch the next one.", "The last train of the night still shows.")
+            .accessibilityIdentifier("roundSkipNext")
+            // Only a clock time has an AM or PM to show.
+            if model.roundLook.hasClock {
+                CheckRow(isOn: model.roundLook.showsPeriod) {
+                    model.roundLook.showsPeriod.toggle()
+                } label: {
+                    Text("AM and PM")
+                }
+                .infoPopover("AM and PM", "Adds AM or PM under the time.")
+                .accessibilityIdentifier("roundShowsPeriod")
+            }
+        }
+        restoreButton(.round)
+    }
+
+    private var roundShowSummary: String {
+        var parts: [String] = []
+        if model.roundLook.skipNext { parts.append("Skip next") }
+        if model.roundLook.hasClock, model.roundLook.showsPeriod { parts.append("AM/PM") }
+        return parts.isEmpty ? "Next train" : parts.joined(separator: ", ")
     }
 }
 

@@ -165,6 +165,11 @@ struct SettingsSheet: View {
                 }
                 .accessibilityIdentifier("welcomeNote")
                 .infoPopover("Welcome note", "What is live, what is the timetable, and who makes the app.", "The note shown when you first opened the app.")
+                LinkRow(title: "Widget legend", symbol: "list.bullet.rectangle.fill", color: .gray) {
+                    model.showLegend()
+                }
+                .accessibilityIdentifier("widgetLegendRow")
+                .infoPopover("Widget legend", "What each mark in the lock screen widgets means.", "Shows it again on the Widget tab, under the preview.")
                 // The version and who made it, with the disclaimer: one block, nothing to tap.
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Version \(AppInfo.versionText) · \(AppInfo.developer)")

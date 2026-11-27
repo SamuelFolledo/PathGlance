@@ -35,6 +35,36 @@ enum RoundContent: String, CaseIterable, Identifiable, Codable, Sendable {
 struct RoundLook: Hashable, Codable, Sendable {
     var content: RoundContent = .minutes
     var font: WidgetFontStyle = .standard
+    /// Follows the line's second train: for a walk too long to catch the next one.
+    var skipNext = false
+    /// AM or PM under a clock time.
+    var showsPeriod = false
+
+    enum CodingKeys: String, CodingKey {
+        case content, font, skipNext, showsPeriod
+    }
+
+    /// Whether `showsPeriod` changes anything: only a clock time has an AM or PM.
+    var hasClock: Bool { content == .clock }
+
+    /// What the board is built with for this look.
+    var boardStyle: WidgetStyle {
+        var style = WidgetStyle()
+        style.skipNext = skipNext
+        return style
+    }
+}
+
+extension RoundLook {
+    /// A look saved before an option existed still reads, with that option at its default.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        content = try values.decodeIfPresent(RoundContent.self, forKey: .content) ?? content
+        font = try values.decodeIfPresent(WidgetFontStyle.self, forKey: .font) ?? font
+        skipNext = try values.decodeIfPresent(Bool.self, forKey: .skipNext) ?? skipNext
+        showsPeriod = try values.decodeIfPresent(Bool.self, forKey: .showsPeriod) ?? showsPeriod
+    }
 }
 
 /// A named look for the round widget.
@@ -74,7 +104,7 @@ struct RoundFace: Hashable, Sendable {
     var label = ""
     /// The large text: "4", "Now", "9:20" or "4, 14".
     var value = ""
-    /// "min" under minutes; empty under a clock time or "Now".
+    /// "min" under minutes, "PM" under a clock time set to show it; empty otherwise.
     var unit = ""
     /// How full the ring is, 0 to 1. Full when the train is `ringMinutes` or more away.
     var fraction = 0.0
@@ -98,7 +128,7 @@ struct RoundFace: Hashable, Sendable {
 
     /// The face for `content`, following `line` if the board has it and the board's first
     /// line otherwise. `nil` when the board has no trains.
-    static func make(board: Board, content: RoundContent, line: Station?, now: Date) -> RoundFace? {
+    static func make(board: Board, content: RoundContent, line: Station?, now: Date, showsPeriod: Bool = false) -> RoundFace? {
         let rows = board.rows.filter { !$0.times.isEmpty }
         guard let row = rows.first(where: { $0.target == line }) ?? rows.first, let next = row.times.first else { return nil }
         var face = RoundFace(label: row.label + row.delay.marker)
@@ -109,6 +139,7 @@ struct RoundFace: Hashable, Sendable {
             face.unit = first.isMinutes ? "min" : ""
         case .clock:
             face.value = CompactTimes.clock(next)
+            if showsPeriod { face.unit = PathTime.calendar.component(.hour, from: next) < 12 ? "AM" : "PM" }
         case .ring:
             face.value = first.value
             face.fraction = min(1, Double(minutes(until: next, now: now)) / Double(ringMinutes))

@@ -295,15 +295,18 @@ final class PathGlanceUITests: XCTestCase {
         }
         XCTAssertTrue(preset("default").waitForExistence(timeout: 10))
         let carousel = app.descendants(matching: .any)["lockScreenPreview"].firstMatch
-        // An earlier run that failed may have left another preset saved.
+        let restore = app.buttons["restorePreset"]
+        // An earlier run that failed may have left another preset saved, or Default edited.
         func backToDefault() {
-            for _ in 0..<12 where !preset("custom").isSelected && !preset("default").isSelected { carousel.swipeRight() }
-            if preset("custom").isSelected { carousel.swipeLeft() }
+            for _ in 0..<12 where !preset("default").isSelected { carousel.swipeRight() }
             expectSelected(preset("default"))
+            revealBelowPreview(restore)
+            if restore.isEnabled { restore.tap() }
             if save.waitForExistence(timeout: 2) { save.tap() }
             XCTAssertTrue(save.waitForNonExistence(timeout: 5))
         }
         backToDefault()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "preset-custom").firstMatch.exists, "There is no Custom card")
         shot("09-widget-tab")
 
         // Tapping a neighbour in the carousel chooses it and offers Save; Cancel puts it back.
@@ -324,28 +327,51 @@ final class PathGlanceUITests: XCTestCase {
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
 
-        // Editing it makes it the custom look, which takes the first card.
+        // An edit stays with the preset in hand, which says so once it differs.
+        XCTAssertFalse(preset("packed").label.contains("edited"))
         let serif = app.buttons["font-serif"]
         revealBelowPreview(serif)
         serif.tap()
         XCTAssertTrue(save.waitForExistence(timeout: 5))
-        expectSelected(preset("custom"))
+        expectSelected(preset("packed"))
+        XCTAssertTrue(preset("packed").label.contains("edited"), "label is \(preset("packed").label)")
         save.tap()
-        shot("11-custom-preset")
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        shot("11-edited-preset")
 
-        // The Round tab has its own presets and its own custom look.
+        // The edit waits with its preset while another is looked at.
+        carousel.swipeRight()
+        expectSelected(preset("default"))
+        XCTAssertTrue(preset("packed").label.contains("edited"))
+        app.buttons["cancelLook"].tap()
+        expectSelected(preset("packed"))
+
+        // Restore preset undoes it, on Save like any other change.
+        revealBelowPreview(restore)
+        XCTAssertTrue(restore.isEnabled)
+        restore.tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(preset("packed").label.contains("edited"))
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(restore.isEnabled, "Nothing left to restore")
+
+        // The Round tab has its own presets and keeps its own edits.
         picker.buttons["Round widget"].tap()
         XCTAssertTrue(preset("round-minutes").waitForExistence(timeout: 5))
         shot("12-round-tab")
+        XCTAssertFalse(app.buttons["roundShowsPeriod"].exists, "Minutes have no AM or PM to show")
         preset("round-clock").tap()
         expectSelected(preset("round-clock"))
         XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["roundShowsPeriod"].waitForExistence(timeout: 5), "A clock time can show AM or PM")
         shot("13-round-clock")
         let roundSerif = app.buttons["roundFont-serif"]
         revealBelowPreview(roundSerif, preview: "roundPreview")
         roundSerif.tap()
-        expectSelected(preset("round-custom"))
-        shot("14-round-custom")
+        expectSelected(preset("round-clock"))
+        XCTAssertTrue(preset("round-clock").label.contains("edited"))
+        shot("14-round-edited")
         app.buttons["cancelLook"].tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
         expectSelected(preset("round-minutes"))
@@ -360,6 +386,84 @@ final class PathGlanceUITests: XCTestCase {
 
         // Back to the default for later runs.
         backToDefault()
+    }
+
+    /// The legend closes for good and comes back from Settings; hiding the station row
+    /// is explained first; the Show options change the preview.
+    func testLegendAndShowOptions() {
+        // The legend showing and no guide silenced, whatever an earlier run left.
+        launch(tab: "widget", extra: ["-widgetLegendHidden", "NO", "-silencedGuides", "()"])
+        let legend = app.descendants(matching: .any)["widgetLegend"].firstMatch
+        XCTAssertTrue(legend.waitForExistence(timeout: 30), "The legend sits under the preview")
+        let dots = app.descendants(matching: .any)["widgetLegendDots"].firstMatch
+        XCTAssertTrue(dots.label.hasPrefix("Mark 1 of"), "label is \(dots.label)")
+        shot("15-legend")
+        app.buttons["widgetLegendDismiss"].firstMatch.tap()
+        XCTAssertTrue(legend.waitForNonExistence(timeout: 5), "The X closes the legend")
+
+        // Settings, About, Widget legend brings it back and steps out of the way.
+        app.buttons["settingsButton"].tap()
+        let row = app.buttons["widgetLegendRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        reveal(row)
+        for _ in 0..<3 where row.frame.maxY > app.buttons["tab-trains"].frame.minY - 8 { app.swipeUp() }
+        row.tap()
+        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5), "Settings closes")
+        XCTAssertTrue(legend.waitForExistence(timeout: 5), "The legend is back")
+
+        // Hiding the station row is explained before it happens.
+        let refresh = app.buttons["previewRefresh"].firstMatch
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10), "The station row is the preview's top row")
+        let header = app.buttons["showsHeader"]
+        revealBelowPreview(header)
+        XCTAssertTrue(header.isSelected)
+        shot("16-show-section")
+        header.tap()
+        XCTAssertTrue(app.buttons["guideDontShowAgain"].waitForExistence(timeout: 5), "Hiding the station row is explained first")
+        shot("17-hide-header-guide")
+        app.buttons["guideConfirm"].tap()
+        XCTAssertTrue(app.buttons["guideConfirm"].waitForNonExistence(timeout: 5))
+        XCTAssertFalse(header.isSelected)
+        XCTAssertTrue(refresh.waitForNonExistence(timeout: 5), "The row is gone from the preview")
+
+        // The rest are plain ticks.
+        for option in ["skipNext", "showsPeriod", "compress"] {
+            let box = app.buttons[option]
+            revealBelowPreview(box)
+            XCTAssertFalse(box.isSelected, "\(option) starts off")
+            box.tap()
+            XCTAssertTrue(box.isSelected)
+        }
+        shot("18-show-options-on")
+        XCTAssertTrue(app.buttons["saveLook"].exists)
+        app.buttons["cancelLook"].tap()
+        XCTAssertTrue(app.buttons["saveLook"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(header.isSelected, "Cancel brings the station row back")
+    }
+
+    /// A guide raised from inside Settings and closed must leave Settings working.
+    func testSettingsOpensAgainAfterAGuide() {
+        launch(tab: "widget")
+        let menu = app.buttons["settingsButton"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let fold = app.buttons["fold-settings-preferences"]
+        XCTAssertTrue(fold.waitForExistence(timeout: 5))
+        app.swipeUp()
+        let restore = app.buttons["restoreDefaults"]
+        reveal(restore)
+        for _ in 0..<3 where restore.frame.maxY > app.buttons["tab-trains"].frame.minY - 8 { app.swipeUp() }
+        restore.tap()
+        XCTAssertTrue(app.buttons["guideCancel"].waitForExistence(timeout: 5))
+        app.buttons["guideCancel"].tap()
+        XCTAssertTrue(app.buttons["guideCancel"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(restore.exists, "Settings is still there under the guide")
+
+        app.buttons["Close"].firstMatch.tap()
+        XCTAssertTrue(fold.waitForNonExistence(timeout: 5), "The X closes Settings")
+        menu.tap()
+        XCTAssertLessThan(menu.frame.width, 100, "The button keeps its own frame, for VoiceOver and for this tap")
+        XCTAssertTrue(fold.waitForExistence(timeout: 5), "Settings opens again")
     }
 
     /// Waits for a carousel card to become the chosen one.
@@ -541,8 +645,7 @@ final class PathGlanceUITests: XCTestCase {
         first.press(forDuration: 0.1, thenDragTo: wtc)
         XCTAssertLessThan(first.frame.minY, wtc.frame.minY, "33rd Street leads again")
 
-        // Hiding a line is explained first. (Last: see the note in docs/todos.md about
-        // Settings not opening again once a guide has been shown.)
+        // Hiding a line is explained first.
         let newark = app.buttons["line-newark"].firstMatch
         if !newark.isSelected { newark.tap() }
         newark.tap()

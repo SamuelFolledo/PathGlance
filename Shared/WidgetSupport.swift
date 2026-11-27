@@ -72,8 +72,10 @@ struct BoardWidgetView<Header: View, TapArea: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header(AnyView(headerRow))
-                .font(fontStyle.headerFont(style.density))
+            if style.showsHeader {
+                header(AnyView(headerRow))
+                    .font(fontStyle.headerFont(style.density))
+            }
             if board.rows.isEmpty {
                 Text("No upcoming trains")
             } else {
@@ -138,6 +140,7 @@ struct BoardWidgetView<Header: View, TapArea: View>: View {
         return Text(text)
             .lineLimit(max(board.lines(perLine: count).count, 1))
             .multilineTextAlignment(.leading)
+            .tracking(style.compress ? -0.5 : 0)
             // Where the view is animated (the app's preview), a change of text fades through.
             .contentTransition(.opacity)
     }

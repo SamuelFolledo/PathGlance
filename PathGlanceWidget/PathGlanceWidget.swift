@@ -214,7 +214,7 @@ struct RoundProvider: TimelineProvider {
         let now = Date()
         let look = SharedStore.roundLook
         let line = SharedStore.roundLine
-        guard let plan = await BoardProvider.plan(now: now, style: WidgetStyle()) else {
+        guard let plan = await BoardProvider.plan(now: now, style: look.boardStyle) else {
             return ([RoundEntry(date: now, board: nil, look: look, line: line)], now.addingTimeInterval(30 * 60))
         }
         let reload = BoardProvider.reloadDate(from: now)
@@ -228,7 +228,7 @@ struct RoundView: View {
     let entry: RoundEntry
 
     var body: some View {
-        let face = entry.board.flatMap { RoundFace.make(board: $0, content: entry.look.content, line: entry.line, now: entry.date) }
+        let face = entry.board.flatMap { RoundFace.make(board: $0, content: entry.look.content, line: entry.line, now: entry.date, showsPeriod: entry.look.showsPeriod) }
         ZStack {
             AccessoryWidgetBackground()
             RoundWidgetView(face: face, look: entry.look)

@@ -120,6 +120,44 @@ struct BoardPlanTests {
         #expect(board.lines.first?.text == "33rd 7:10→7:33, 7:20, 7:30")
     }
 
+    @Test func skippingTheNextTrainStartsEachLineFromItsSecond() {
+        var style = WidgetStyle(timeFormat: .short)
+        style.skipNext = true
+        let board = plan(.journalSquare, style: style).board(at: now)
+        #expect(board.lines.map(\.text) == ["33rd 7:20 :30 :40 :50 8:00", "WTC 7:13 :23 :33 :43 :53"])
+    }
+
+    @Test func theLastTrainIsNeverSkipped() {
+        var only = plan(.journalSquare, targets: [.thirtyThirdStreet])
+        only.style.skipNext = true
+        only.groups[0].trains = Array(only.groups[0].trains.prefix(1))
+        #expect(only.board(at: now).lines.first?.times.count == 1)
+    }
+
+    @Test func amAndPmFollowTheFirstTimeAndAChangeOfPeriod() {
+        var style = WidgetStyle(density: .regular, timeFormat: .full, showArrival: true)
+        style.showsPeriod = true
+        #expect(plan(.journalSquare, style: style).board(at: now).lines.first?.text == "33rd 7:10→7:33 AM, 7:20, 7:30")
+        let late = [Fixture.date("2026-11-24 11:50"), Fixture.date("2026-11-24 12:05"), Fixture.date("2026-11-24 12:20")]
+        #expect(CompactTimes.string(late, format: .full, showsPeriod: true) == "11:50 AM, 12:05 PM, 12:20")
+        #expect(CompactTimes.string(late, format: .short, showsPeriod: true) == "11:50 AM 12:05 PM :20")
+        #expect(CompactTimes.string(late, format: .full) == "11:50, 12:05, 12:20", "Off by default")
+    }
+
+    @Test func compressingDropsTheSpaceAfterCommas() {
+        var style = WidgetStyle(density: .compact, timeFormat: .full)
+        style.compress = true
+        let line = plan(.journalSquare, style: style).board(at: now).lines.first
+        #expect(line?.text == "33rd 7:10,7:20,7:30,7:40")
+        #expect(line?.compress == true)
+    }
+
+    @Test func theNewOptionsAreOffAndTheStationRowOnByDefault() {
+        let style = WidgetStyle()
+        #expect(!style.skipNext && !style.showsPeriod && !style.compress && style.showsHeader)
+        #expect(WidgetPreset.builtIn.allSatisfy { $0.look.style.showsHeader && !$0.look.style.skipNext })
+    }
+
     @Test func trainsDropOffAMinuteAfterLeaving() {
         let board = plan(.journalSquare)
         #expect(board.board(at: Fixture.date("2026-11-24 07:10")).lines.first?.times.first == Fixture.date("2026-11-24 07:10"))

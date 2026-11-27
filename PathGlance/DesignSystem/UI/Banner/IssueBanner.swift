@@ -13,15 +13,54 @@ struct IssueBannerItem: Identifiable, Equatable {
 }
 
 /// One strip that says something is up: an icon, a title, a line under it, the time, and
-/// an X that puts it away. Tapping anywhere but the X opens it.
+/// an X that puts it away. Tapping anywhere but the X opens it, when there is something
+/// to open. The Widget tab's legend is the same strip in grey, with nothing behind it.
 struct IssueBanner: View {
     let item: IssueBannerItem
-    let open: () -> Void
+    /// `nil` when the banner says all there is: it is then text, not a button.
+    var open: (() -> Void)?
+    /// What the X does, for VoiceOver.
+    var dismissLabel = "Hide until tomorrow"
+    /// For UI tests: the banner is `<name>` and its X `<name>Dismiss`.
+    var name = "issueBanner"
+    /// How many lines the text under the title may take.
+    var subtitleLines = 2
     let dismiss: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            Button(action: open) {
+            if let open {
+                Button(action: open) { text }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Shows the details")
+                    .accessibilityIdentifier(name)
+            } else {
+                text
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(name)
+            }
+
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40, height: 40)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(dismissLabel)
+            .accessibilityIdentifier("\(name)Dismiss")
+        }
+        .background(item.color.opacity(0.14), in: .rect(cornerRadius: Theme.Radius.banner))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.banner)
+                .strokeBorder(item.color.opacity(0.45), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var text: some View {
                 HStack(alignment: .top, spacing: Theme.Spacing.md) {
                     Image(systemName: item.symbol)
                         .font(.body.weight(.semibold))
@@ -45,7 +84,7 @@ struct IssueBanner: View {
                             Text(item.subtitle)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                                .lineLimit(subtitleLines)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
@@ -54,29 +93,6 @@ struct IssueBanner: View {
                 .padding(.vertical, 10)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            .accessibilityHint("Shows the details")
-            .accessibilityIdentifier("issueBanner")
-
-            Button(action: dismiss) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 40, height: 40)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Hide until tomorrow")
-            .accessibilityIdentifier("issueBannerDismiss")
-        }
-        .background(item.color.opacity(0.14), in: .rect(cornerRadius: Theme.Radius.banner))
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.banner)
-                .strokeBorder(item.color.opacity(0.45), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
     }
 }
 
@@ -84,7 +100,12 @@ struct IssueBanner: View {
 /// them saying how many there are. Nothing shows when there are none.
 struct IssueBannerStack: View {
     let items: [IssueBannerItem]
-    let onOpen: (IssueBannerItem) -> Void
+    /// `nil` when the banners have nothing to open.
+    var onOpen: ((IssueBannerItem) -> Void)?
+    var dismissLabel = "Hide until tomorrow"
+    var name = "issueBanner"
+    var noun = "Notice"
+    var subtitleLines = 2
     /// Called after the X is tapped. The owner drops the item from `items`.
     let onDismiss: (IssueBannerItem) -> Void
 
@@ -100,7 +121,8 @@ struct IssueBannerStack: View {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 0) {
                         ForEach(items) { item in
-                            IssueBanner(item: item, open: { onOpen(item) }, dismiss: { dismiss(item) })
+                            IssueBanner(item: item, open: onOpen.map { open in { open(item) } }, dismissLabel: dismissLabel,
+                                        name: name, subtitleLines: subtitleLines, dismiss: { dismiss(item) })
                                 .containerRelativeFrame(.horizontal)
                                 .id(item.id)
                         }
@@ -114,8 +136,8 @@ struct IssueBannerStack: View {
                 // As tall as the tallest banner and no taller; each banner fills that.
                 .fixedSize(horizontal: false, vertical: true)
 
-                PageDots(count: items.count, index: index, noun: "Notice")
-                    .accessibilityIdentifier("issueBannerDots")
+                PageDots(count: items.count, index: index, noun: noun)
+                    .accessibilityIdentifier("\(name)Dots")
             }
             .animation(Theme.Motion.content, value: items)
             .onChange(of: items.map(\.id)) { _, ids in

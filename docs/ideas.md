@@ -19,6 +19,13 @@ Things that might be worth doing and that nobody has agreed to yet. Nothing here
 ## Widget
 
 - Preview the widget's states (delayed, last train, no service) from the Widget tab (drawing WF) (2026-11-23)
+- More toggles for the widget's Show section, suggested to the owner and not chosen (2026-11-27):
+	- Minutes instead of clock times on the rectangle ("33rd 4, 14 min")
+	- Show the last-updated time, apart from the station's name
+	- Show the ? and ! delay marks
+	- Show the warning triangle for an open issue
+	- Show the line's name on the round widget; off leaves only the number, larger
+- With the station row hidden, use the freed height: larger lines, or a third line of times (2026-11-27)
 
 ## App
 

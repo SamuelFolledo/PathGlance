@@ -97,9 +97,9 @@ struct RoundWidgetTests {
     }
 }
 
-/// Custom looks live in the app's defaults, so these put back what they found.
-@MainActor @Suite(.serialized) struct CustomPresetTests {
-    private static let keys = ["customWidgetPreset", "customRoundPreset"]
+/// Presets and their edits live in the app's defaults, so these put back what they found.
+@MainActor @Suite(.serialized) struct PresetEditTests {
+    private static let keys = ["customWidgetPreset", "customRoundPreset", "widgetPresetID", "widgetPresetEdits", "roundPresetID", "roundPresetEdits"]
 
     private func keepingDefaults(_ body: () throws -> Void) rethrows {
         let saved = Self.keys.map { UserDefaults.standard.object(forKey: $0) }
@@ -115,41 +115,78 @@ struct RoundWidgetTests {
         try body()
     }
 
-    @Test func eachShapeRemembersItsOwnCustomLook() {
+    @Test func anEditStaysWithItsPresetOnceSaved() {
         keepingDefaults {
             let model = AppModel()
-            #expect(model.customPreset == nil)
-            #expect(model.customRoundPreset == nil)
+            #expect(model.presetID == "default" && model.roundPresetID == "minutes")
+            #expect(!model.canRestorePreset(.rectangle))
 
-            // Changing a built-in preset makes it the custom look at once, before any Save.
+            // An edit changes the preset in hand, not some other card.
             model.look.style.maxTimes = 1
-            #expect(model.customPreset?.look == WidgetLook(style: WidgetStyle(maxTimes: 1)))
-            #expect(model.customRoundPreset == nil)
+            #expect(model.presetID == "default")
+            #expect(model.isEdited(preset: "default", shape: .rectangle))
+            #expect(model.hasUnsavedLook)
+            model.saveLook()
+            #expect(!model.hasUnsavedLook)
+            #expect(model.presets.edits["default"] == WidgetLook(style: WidgetStyle(maxTimes: 1)))
+            #expect(SharedStore.widgetLook.style.maxTimes == 1)
 
-            model.roundLook.font = .monospaced
-            #expect(model.customRoundPreset?.look == RoundLook(content: .minutes, font: .monospaced))
-            #expect(model.customPreset?.look == WidgetLook(style: WidgetStyle(maxTimes: 1)))
+            // Another preset is as built; coming back finds the saved edit.
+            model.selectPreset("packed", shape: .rectangle)
+            #expect(model.look == WidgetPreset.builtIn[1].look)
+            #expect(model.isEdited(preset: "default", shape: .rectangle), "The card left behind still says Edited")
+            model.selectPreset("default", shape: .rectangle)
+            #expect(model.look.style.maxTimes == 1)
 
-            // Moving on to a built-in preset keeps both.
-            model.look = WidgetPreset.builtIn[2].look
-            model.roundLook = RoundPreset.builtIn[1].look
-            #expect(model.customPreset?.look == WidgetLook(style: WidgetStyle(maxTimes: 1)))
-            #expect(model.customRoundPreset?.look.font == .monospaced)
-
-            // And they are still there on the next launch.
+            // And it is still there on the next launch.
             let next = AppModel()
-            #expect(next.customPreset?.look == WidgetLook(style: WidgetStyle(maxTimes: 1)))
-            #expect(next.customRoundPreset?.look.font == .monospaced)
+            #expect(next.presetID == "default" && next.look.style.maxTimes == 1)
+            #expect(next.presets.edits.count == 1)
         }
     }
 
-    @Test func theOlderSingleCustomLookBecomesTheRectangles() throws {
-        try keepingDefaults {
-            let old = AppModel.CustomPreset(look: WidgetLook(font: .rounded, style: WidgetStyle(density: .regular)), savedAt: Date())
-            UserDefaults.standard.set(try JSONEncoder().encode(old), forKey: "customWidgetPreset")
+    @Test func turningToAnotherPresetDropsWhatWasNotSaved() {
+        keepingDefaults {
             let model = AppModel()
-            #expect(model.customPreset?.look == old.look)
-            #expect(model.customRoundPreset == nil)
+            model.look.font = .serif
+            model.selectPreset("large", shape: .rectangle)
+            #expect(model.look(forPreset: "default") == WidgetLook(), "The unsaved change is gone")
+            #expect(!model.isEdited(preset: "default", shape: .rectangle))
+
+            // The same on the round widget, which keeps its own.
+            model.roundLook.skipNext = true
+            model.selectPreset("clock", shape: .round)
+            #expect(model.roundLook == RoundPreset.builtIn[1].look)
+            #expect(!model.isEdited(preset: "minutes", shape: .round))
+
+            // Cancel goes back to the presets the widgets are on.
+            model.revertLook()
+            #expect(model.presetID == "default" && model.roundPresetID == "minutes")
+            #expect(!model.hasUnsavedLook)
+        }
+    }
+
+    @Test func restorePresetIsAnEditLikeAnyOther() {
+        keepingDefaults {
+            let model = AppModel()
+            model.roundLook.font = .serif
+            model.saveLook()
+            #expect(model.canRestorePreset(.round))
+            #expect(!model.canRestorePreset(.rectangle))
+
+            // Restoring shows in the preview and waits for Save; Cancel undoes it.
+            model.restorePreset(.round)
+            #expect(model.roundLook == RoundLook())
+            #expect(model.hasUnsavedLook)
+            #expect(SharedStore.roundLook.font == .serif, "The widget keeps the edit until Save")
+            model.revertLook()
+            #expect(model.roundLook.font == .serif)
+
+            model.restorePreset(.round)
+            model.saveLook()
+            #expect(model.roundPresets.edits.isEmpty)
+            #expect(SharedStore.roundLook == RoundLook())
+            #expect(!model.canRestorePreset(.round))
         }
     }
 
@@ -157,16 +194,117 @@ struct RoundWidgetTests {
         keepingDefaults {
             let model = AppModel()
             #expect(!model.hasUnsavedLook)
-            model.roundLook = RoundPreset.builtIn[2].look
+            model.selectPreset("ring", shape: .round)
             #expect(model.hasUnsavedLook)
             model.revertLook()
             #expect(model.roundLook == RoundLook())
-            model.roundLook = RoundPreset.builtIn[2].look
-            model.look = WidgetPreset.builtIn[1].look
+            model.selectPreset("ring", shape: .round)
+            model.selectPreset("packed", shape: .rectangle)
             model.saveLook()
             #expect(!model.hasUnsavedLook)
             #expect(SharedStore.roundLook == RoundPreset.builtIn[2].look)
             #expect(SharedStore.widgetLook == WidgetPreset.builtIn[1].look)
+            #expect(model.presets.selected == "packed" && model.roundPresets.selected == "ring")
         }
+    }
+
+    @Test func restoreDefaultsClearsEditsUnlessPresetsAreKept() {
+        keepingDefaults {
+            let model = AppModel()
+            model.selectPreset("packed", shape: .rectangle)
+            model.look.style.compress = true
+            model.saveLook()
+
+            model.restoreDefaults(keeping: [.presets])
+            #expect(model.presetID == "packed" && model.look.style.compress)
+            #expect(model.presets.edits["packed"] != nil)
+
+            model.restoreDefaults()
+            #expect(model.presetID == "default" && model.look == WidgetLook())
+            #expect(model.presets.edits.isEmpty)
+            #expect(AppModel().presets.edits.isEmpty)
+        }
+    }
+
+    // MARK: Taking over from older builds
+
+    private let rectangles = WidgetPreset.builtIn.map { (id: $0.id, look: $0.look) }
+    private let rounds = RoundPreset.builtIn.map { (id: $0.id, look: $0.look) }
+
+    @Test func anOlderLookThatMatchesNoPresetBecomesEditsOnTheFirst() {
+        let mine = WidgetLook(font: .rounded, style: WidgetStyle(density: .regular))
+        let book = PresetBook.resolve(saved: mine, storedID: nil, storedEdits: [:], custom: mine, builtIn: rectangles, fallback: "default")
+        #expect(book.selected == "default")
+        #expect(book.edits == ["default": mine])
+    }
+
+    @Test func anOlderSpareCustomLookBecomesEditsOnTheFirst() {
+        let mine = RoundLook(content: .minutes, font: .monospaced)
+        let book = PresetBook.resolve(saved: RoundPreset.builtIn[1].look, storedID: nil, storedEdits: [:], custom: mine, builtIn: rounds, fallback: "minutes")
+        #expect(book.selected == "clock", "The widget stays on the preset it shows")
+        #expect(book.edits == ["minutes": mine])
+
+        // The first preset cannot be both in use as built and edited: what shows is kept.
+        let onFirst = PresetBook.resolve(saved: RoundLook(), storedID: nil, storedEdits: [:], custom: mine, builtIn: rounds, fallback: "minutes")
+        #expect(onFirst.selected == "minutes" && onFirst.edits.isEmpty)
+    }
+
+    @Test func whatTheWidgetDrawsWinsOverAStaleBook() {
+        // The stored book says Packed as built, but the widget has something else.
+        let drawn = WidgetLook(font: .condensed, style: WidgetStyle(density: .compact, timeFormat: .short, maxTimes: 2))
+        let book = PresetBook.resolve(saved: drawn, storedID: "packed", storedEdits: ["gone": WidgetLook(), "default": WidgetLook()],
+                                      custom: nil, builtIn: rectangles, fallback: "default")
+        #expect(book.selected == "packed")
+        #expect(book.edits == ["packed": drawn], "Edits for presets that no longer exist, or that change nothing, are dropped")
+    }
+
+    @Test func theOlderCustomLookIsReadFromItsOldKey() throws {
+        try keepingDefaults {
+            let old = OldCustomPreset(look: WidgetLook(font: .rounded, style: WidgetStyle(density: .regular)))
+            UserDefaults.standard.set(try JSONEncoder().encode(old), forKey: "customWidgetPreset")
+            SharedStore.widgetLook = WidgetPreset.builtIn[1].look
+            let model = AppModel()
+            #expect(model.presetID == "packed")
+            #expect(model.look(forPreset: "default") == old.look)
+            #expect(UserDefaults.standard.object(forKey: "customWidgetPreset") == nil, "The old key is used once")
+        }
+    }
+
+    @Test func aLookSavedBeforeAnOptionExistedStillReads() throws {
+        let old = Data(#"{"font":"serif","style":{"density":"regular","timeFormat":"short","showArrival":true,"maxTimes":4}}"#.utf8)
+        let look = try JSONDecoder().decode(WidgetLook.self, from: old)
+        #expect(look == WidgetLook(font: .serif, style: WidgetStyle(density: .regular, timeFormat: .short, showArrival: true, maxTimes: 4)))
+        #expect(look.style.showsHeader && !look.style.skipNext && !look.style.showsPeriod && !look.style.compress)
+        let round = try JSONDecoder().decode(RoundLook.self, from: Data(#"{"content":"clock","font":"rounded"}"#.utf8))
+        #expect(round == RoundLook(content: .clock, font: .rounded))
+    }
+}
+
+@Suite("Round look options")
+struct RoundOptionTests {
+    let now = Fixture.date("2026-11-24 07:01")
+
+    private func board(_ look: RoundLook) -> Board {
+        var plan = BoardPlan(station: .journalSquare, schedule: Fixture.schedule, now: now)
+        plan.style = look.boardStyle
+        return plan.board(at: now)
+    }
+
+    @Test func skippingTheNextTrainFollowsTheSecond() throws {
+        let plain = try #require(RoundFace.make(board: board(RoundLook()), content: .minutes, line: nil, now: now))
+        var look = RoundLook()
+        look.skipNext = true
+        let skipped = try #require(RoundFace.make(board: board(look), content: .minutes, line: nil, now: now))
+        #expect(plain.value == "9" && skipped.value == "19")
+    }
+
+    @Test func onlyAClockTimeHasAPeriod() throws {
+        var look = RoundLook(content: .clock)
+        look.showsPeriod = true
+        #expect(look.hasClock && !RoundLook().hasClock)
+        let clock = try #require(RoundFace.make(board: board(look), content: .clock, line: nil, now: now, showsPeriod: true))
+        #expect(clock.value == "7:10" && clock.unit == "AM")
+        let minutes = try #require(RoundFace.make(board: board(look), content: .minutes, line: nil, now: now, showsPeriod: true))
+        #expect(minutes.unit == "min")
     }
 }

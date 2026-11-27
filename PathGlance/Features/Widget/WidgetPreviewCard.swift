@@ -119,8 +119,8 @@ struct RoundPreviewCard: View {
     }
 
     private var face: RoundFace? {
-        feed.board(model: model, station: model.station(nearest: location.station), style: WidgetStyle())
-            .flatMap { RoundFace.make(board: $0, content: look.content, line: model.roundLine, now: feed.now) }
+        feed.board(model: model, station: model.station(nearest: location.station), style: look.boardStyle)
+            .flatMap { RoundFace.make(board: $0, content: look.content, line: model.roundLine, now: feed.now, showsPeriod: look.showsPeriod) }
     }
 
     var body: some View {

@@ -27,6 +27,7 @@
 `appSheet(item:title:subtitle:accessory:…)` presents over one tab's screen and nothing else: it runs on underneath the tab bar, which stays in view and in reach.
 
 - **Styles** (`AppSheetStyle`): from the bottom edge at about half height (pull up for full, pull down to close), or `.popup`, a small card in the middle for one quick choice (a date, a guide).
+- **Accessibility:** a sheet hides the screen under it from VoiceOver. A popup does not: its card is modal, which is enough, and hiding the screen a second time over a sheet that had already hidden its own left controls with the whole screen as their frame. (2026-11-27)
 - **Dragging** works the way a system sheet does, with one gesture: the content's own scroll drag (`SheetScrollBridge`). The content scrolls at either height; a pull down from its top lowers or closes the sheet, a push up from its end raises a half-height sheet to full. A drag never also taps what it started on.
 - **Closing:** the X, tapping the dimmed area, VoiceOver's escape gesture.
 - **Header:** grabber, title, optional subtitle saying what the sheet is for, optional accessory beside the X.
@@ -71,7 +72,7 @@ All in `UI/Rows/Rows.swift`.
 Elsewhere in `UI/`:
 
 - `UnderlineTabs` (`Tabs`): plain-text tabs on a hairline; the name bold at body size, an optional smaller line under it that keeps its colour when unselected. (2026-11-26)
-- `IssueBanner`, `IssueBannerStack` (`Banner`): a tinted strip with icon, title, a line under it, a time and an X; the stack pages sideways one full width at a time with dots under it. It knows nothing about issues: the screen hands it `IssueBannerItem`s. (2026-11-26)
+- `IssueBanner`, `IssueBannerStack` (`Banner`): a tinted strip with icon, title, a line under it, a time and an X; the stack pages sideways one full width at a time with dots under it. It knows nothing about issues: the screen hands it `IssueBannerItem`s. Without `onOpen` a banner is text, not a button; `name`, `noun` and `dismissLabel` say what it is for tests and VoiceOver. The Widget tab's legend is this stack in grey. (2026-11-26, 2026-11-27)
 - `Tag`, `TagFlow` (`Tags`): small rounded labels that wrap onto new rows. (2026-11-26)
 - `Carousel` (`UI/Carousel`): cards in a row, one centred and its neighbours peeking in at both sides by `peek` points. Swipe, one card per swipe, or tap a neighbour; the choice snaps to the centre. The selection changes only once a swipe has come to rest. The chosen card keeps its own controls; a neighbour is one tap target. Used for the widget presets of both shapes. (2026-11-26)
 - `PageDots`: the dots under anything that pages, hidden when there is one page. Shared by `Carousel` and the issue banner stack, which pages a full width at a time with no peeking. (2026-11-26)

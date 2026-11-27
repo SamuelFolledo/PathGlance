@@ -37,6 +37,7 @@ A fuller onboarding (a swipeable carousel, one page per point, each with a pictu
 | `mute-issues` | "Mute alerts like this" in an issue's sheet | "Mute \<kind, plural\>?" | Cancel · Mute | yes |
 | `unmute-elevator` | The same row, unmuting elevator notices | "Unmute elevator and escalator notices?" | Cancel · Unmute | yes |
 | `restore-defaults` | Settings > Restore defaults | "Restore defaults?" | Cancel · Restore (destructive) | no |
+| `hide-widget-header` | Widget tab > Show > unticking "From station" (`WidgetView.hideHeaderGuide`) | "Hide the station row?" | Cancel · Hide | yes |
 
 ### Points, as in code
 
@@ -67,6 +68,12 @@ A fuller onboarding (a swipeable carousel, one page per point, each with a pictu
 - Every setting goes back to how a fresh install has it (the full sentence is in `WidgetView.swift`).
 - "Explanations you ticked "Don't show this again" on will show again."
 - "The timetable, the issue history and what the app has learned about holidays are kept."
+
+**`hide-widget-header`** (2026-11-27)
+- "The widget will show only its train lines, with nothing above them."
+- "This suits you if you always ride from the same station, or only care about certain lines."
+- "The time it last updated, the refresh tap and the alert mark are on that row, so they go too."
+- "Tick From station again to bring the row back."
 
 ## Open questions
 
