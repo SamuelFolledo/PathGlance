@@ -102,6 +102,42 @@ struct CheckRow<Label: View>: View {
     }
 }
 
+/// A row that does something, with what it is set to (or what a tap will do) on a
+/// second line under its title. Text that would otherwise be a row of its own goes here.
+struct DetailRow: View {
+    let title: String
+    var detail: String = ""
+    /// Shown at the end. `nil` when the row has nothing to do.
+    var symbol: String? = "chevron.right"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Spacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                    if !detail.isEmpty {
+                        Text(detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.vertical, Theme.Spacing.row)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// A row that opens a sheet or popup: title, current value, and a chevron pointing right.
 struct OpenRow: View {
     let title: String
@@ -343,5 +379,21 @@ struct StatusDot: View {
                 }
             }
             .accessibilityLabel(label)
+    }
+}
+
+/// A quick side-to-side shake, for "no, that cannot be done". Raise `shakes` by one
+/// inside an animation and the view shakes once.
+struct Shake: GeometryEffect {
+    var shakes: CGFloat
+    var distance: CGFloat = 5
+
+    var animatableData: CGFloat {
+        get { shakes }
+        set { shakes = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: distance * sin(shakes * .pi * 6), y: 0))
     }
 }

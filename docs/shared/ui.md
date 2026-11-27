@@ -48,7 +48,7 @@ A `Guide` explains before an action that matters. Every one is listed in [Welcom
 | Mark | When | Code |
 |---|---|---|
 | Round radio | one of several | `RadioRow`, `PopoverRadioRow` |
-| Round check | any number of several, in a list of choices (lines shown, favorite stops, muted issues) | `CheckRow` (default `shape: .round`) |
+| Round check | any number of several, in a list of choices (lines preferred, muted issues) | `CheckRow` (default `shape: .round`) |
 | **Square check** | a check that stands alone in an alert or guide, or beside a section title; onboarding when it exists | `CheckRow(isOn:shape: .square)` |
 
 `CheckShape` holds the two outlines and their symbols (`checkmark.square.fill` / `square`, `checkmark.circle.fill` / `circle`). The square is the same exception usualspots makes for its "Don't show this again" box. (decided 2026-11-23)
@@ -58,6 +58,9 @@ A `Guide` explains before an action that matters. Every one is listed in [Welcom
 All in `UI/Rows/Rows.swift`.
 
 - `RadioRow`, `CheckRow`: a mark, a label, a hairline under it.
+- `DetailRow`: a row that does something, with what it is set to on a second line under its title. A fact that would be a row of its own with nothing to tap goes there instead. (2026-11-27)
+- `PopoverRadioRow` can carry a `PopoverAccessory`: a small button at its end that does its own thing without picking the row or closing the popover. The station list's stars are these. (2026-11-27)
+- `Shake`: a short side-to-side shake for "that cannot be done", used with the error haptic. (2026-11-27)
 - `OpenRow`: title, current value, a chevron pointing right. Opens a sheet or popup.
 - `LinkRow`: a coloured symbol, a title, and a mark when it opens outside the app.
 - `FoldCard`: a titled group in its own card that folds away; open by default, remembered between launches; the whole title bar folds it, and folded it shows its value.

@@ -82,7 +82,7 @@ final class PathGlanceUITests: XCTestCase {
     /// At rest the station is the title with the date under it. Scrolled on, the title
     /// leaves and the date stays; back at now, the title returns. The same at large text.
     func testHeaderGivesWayToTheDateWhenScrolled() {
-        for (name, extra) in [("09-header", []), ("10-header-large", ["-textSizeStep", "<integer>\(largeTextStep)</integer>"])] {
+        for (name, extra) in [("09-header", []), ("10-header-large", ["-textSizeOffset", "<integer>\(largestTextOffset)</integer>"])] {
             launch(extra: extra)
             XCTAssertTrue(picker.waitForExistence(timeout: 30))
             let title = app.buttons["originMenu"].firstMatch
@@ -95,6 +95,8 @@ final class PathGlanceUITests: XCTestCase {
 
             let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
             from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -260)))
+            _ = title.waitForNonExistence(timeout: 5)
+            shot("\(name)-scrolled")
             XCTAssertTrue(title.waitForNonExistence(timeout: 5), "Scrolled on, the station title leaves")
             XCTAssertTrue(date.exists && date.isHittable, "The date is always there")
             XCTAssertEqual(picker.buttons.count, 3, "The tabs stay")
@@ -108,32 +110,27 @@ final class PathGlanceUITests: XCTestCase {
         }
     }
 
-    /// The largest step of Settings > Text size.
-    private let largeTextStep = 6
+    /// The top of Settings > Text size: as far above the phone's own size as the slider goes.
+    private let largestTextOffset = 3
 
     func testFavoriteStopAddsAColumn() {
         launch()
         XCTAssertTrue(picker.waitForExistence(timeout: 30))
-        // Favorite stops are edited from the station list.
+        // A favorite stop is starred in the station list, which stays open for it.
         app.buttons["originMenu"].firstMatch.tap()
-        let favorites = app.buttons["menuFavoriteStops"]
-        XCTAssertTrue(favorites.waitForExistence(timeout: 5))
-        reveal(favorites)
-        favorites.tap()
-        let newport = app.buttons["favorite-newport"]
-        XCTAssertTrue(newport.waitForExistence(timeout: 5))
-        if !newport.isSelected { newport.tap() }
-        shot("02-favorites-sheet")
-        XCTAssertTrue(app.buttons["tab-issues"].exists, "The tab bar stays in view over a sheet")
-        // Dragging the content, not the title, brings the last row up clear of the tab bar.
-        let last = app.buttons["favorite-thirtyThirdStreet"]
-        let tabBarTop = app.buttons["tab-issues"].frame.minY
-        for _ in 0..<4 where !(last.exists && last.frame.maxY <= tabBarTop) {
-            newport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05, thenDragTo: newport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -5)))
-        }
-        XCTAssertTrue(last.exists && last.frame.maxY <= tabBarTop, "The sheet's content scrolls until its end is above the tab bar")
-        shot("02b-favorites-scrolled")
-        app.buttons["Close"].tap()
+        let star = app.buttons["star-newport"]
+        XCTAssertTrue(star.waitForExistence(timeout: 5))
+        reveal(star)
+        if !star.isSelected { star.tap() }
+        XCTAssertTrue(star.waitForSelected(), "The star fills in")
+        XCTAssertTrue(app.buttons["station-newport"].exists, "Starring a stop leaves the list open")
+        XCTAssertTrue(app.buttons["menuClearFavorites"].waitForExistence(timeout: 3), "With a favorite, the list offers to clear them")
+        shot("02-station-stars")
+        // Picking the station already in use closes the list and changes nothing else.
+        let current = app.buttons["station-journalSquare"]
+        for _ in 0..<4 where !current.isHittable { app.swipeDown() }
+        current.tap()
+        confirmGuideIfShown()
         let column = app.buttons["column-newport"]
         XCTAssertTrue(column.waitForExistence(timeout: 5), "Journal Square to 33rd passes Newport, so it gets a column")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Departs'")).firstMatch.waitForExistence(timeout: 10), "The list comes back with the new column")
@@ -145,6 +142,14 @@ final class PathGlanceUITests: XCTestCase {
         XCTAssertTrue(hidden.waitForExistence(timeout: 5), "A hidden column stays in reach")
         XCTAssertTrue(column.waitForNonExistence(timeout: 5))
         shot("03b-column-hidden")
+
+        // Two columns are the least there can be: the last one beside your station stays.
+        let destination = app.buttons["column-thirtyThirdStreet"]
+        XCTAssertTrue(destination.exists)
+        destination.tap()
+        XCTAssertFalse(app.buttons["showColumn-thirtyThirdStreet"].waitForExistence(timeout: 2), "The second column cannot be hidden")
+        XCTAssertTrue(destination.exists)
+
         hidden.tap()
         XCTAssertTrue(column.waitForExistence(timeout: 5), "Tapping it brings the column back")
     }
@@ -174,11 +179,11 @@ final class PathGlanceUITests: XCTestCase {
 
         // A tap opens the issue with its updates on a rail.
         app.buttons["issueBanner"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["sortUpdates"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["muteRow"].exists)
+        XCTAssertTrue(app.buttons["muteRow"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["muteButton"].exists, "Muting is the row at the bottom, not a bell beside the X")
         shot("23-issue-detail")
         app.buttons["Close"].firstMatch.tap()
-        _ = app.buttons["sortUpdates"].waitForNonExistence(timeout: 3)
+        _ = app.buttons["muteRow"].waitForNonExistence(timeout: 3)
 
         // The X puts one away for the day.
         let before = app.buttons.matching(identifier: "issueBannerDismiss").count
@@ -369,7 +374,7 @@ final class PathGlanceUITests: XCTestCase {
         let menu = app.buttons["settingsButton"]
         XCTAssertTrue(menu.waitForExistence(timeout: 30))
         menu.tap()
-        let station = app.buttons["fold-settings-station"]
+        let station = app.buttons["fold-settings-preferences"]
         XCTAssertTrue(station.waitForExistence(timeout: 5))
         shot("12-settings-sheet")
 
@@ -385,6 +390,12 @@ final class PathGlanceUITests: XCTestCase {
         restore.tap()
         XCTAssertTrue(app.buttons["guideConfirm"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["guideDontShowAgain"].exists, "A destructive action always asks")
+        // Three things can be kept, and none is ticked to begin with.
+        for kept in ["favoriteStops", "mutedIssues", "presets"] {
+            let box = app.buttons["guideOption-\(kept)"]
+            XCTAssertTrue(box.exists, "\(kept) can be kept")
+            XCTAssertFalse(box.isSelected, "\(kept) starts unticked")
+        }
         shot("13-restore-guide")
         app.buttons["guideConfirm"].tap()
 
@@ -421,7 +432,7 @@ final class PathGlanceUITests: XCTestCase {
         let menu = app.buttons["settingsButton"]
         XCTAssertTrue(menu.waitForExistence(timeout: 30))
         menu.tap()
-        XCTAssertTrue(app.buttons["fold-settings-station"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["fold-settings-preferences"].waitForExistence(timeout: 5))
 
         let coffee = app.buttons["donate-coffee"]
         reveal(coffee)
@@ -473,15 +484,67 @@ final class PathGlanceUITests: XCTestCase {
         gotIt.tap()
     }
 
-    func testHidingALineIsExplainedFirst() {
-        launch(tab: "widget")
-        let newark = app.buttons["line-newark"].firstMatch
-        XCTAssertTrue(newark.waitForExistence(timeout: 30))
-        revealBelowPreview(newark)
-        if !newark.isSelected {
-            newark.tap()
-            revealBelowPreview(newark)
+    /// Lines preferred lives in Settings: it starts folded, a line can be dragged first,
+    /// the Trains tabs follow, and hiding one is explained before it happens.
+    func testLinesPreferredReordersTheTabsAndExplainsHiding() {
+        let menu = app.buttons["settingsButton"]
+        let fold = app.buttons["fold-settings-lines"]
+        let wtc = app.descendants(matching: .any)["lineHandle-worldTradeCenter"].firstMatch
+        let first = app.descendants(matching: .any)["lineHandle-thirtyThirdStreet"].firstMatch
+
+        /// Opens Settings with Lines preferred unfolded and its rows in the clear.
+        func openLines(expectFolded: Bool) {
+            XCTAssertTrue(menu.waitForExistence(timeout: 30))
+            menu.tap()
+            XCTAssertTrue(fold.waitForExistence(timeout: 5))
+            if expectFolded { XCTAssertFalse(wtc.exists, "Lines preferred starts folded") }
+            if !wtc.exists { fold.tap() }
+            XCTAssertTrue(wtc.waitForExistence(timeout: 5))
+            // Pull the sheet up to full height, then bring both rows into the clear between
+            // the sheet's title and the tab bar: a row behind either cannot be dragged.
+            app.swipeUp()
+            let title = app.staticTexts["Settings"].firstMatch
+            let tabBarTop = app.buttons["tab-trains"].frame.minY
+            let middle = (title.frame.maxY + tabBarTop) / 2
+            for _ in 0..<10 {
+                let top = min(first.frame.minY, wtc.frame.minY), bottom = max(first.frame.maxY, wtc.frame.maxY)
+                if top > title.frame.maxY + 30 && bottom < tabBarTop - 30 { break }
+                let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 200, dy: middle))
+                let distance = max(-200, min(200, middle - (top + bottom) / 2))
+                start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)))
+            }
         }
+
+        launch(tab: "widget", extra: ["-foldedSections", "(settings-lines)"])
+        openLines(expectFolded: true)
+        // World Trade Center above 33rd Street: its handle is dragged onto the first row's.
+        if wtc.frame.minY > first.frame.minY { wtc.press(forDuration: 0.1, thenDragTo: first) }
+        // Let the row settle before looking.
+        _ = app.buttons["no-such-button"].waitForExistence(timeout: 1)
+        shot("26-lines-reordered")
+        XCTAssertLessThan(wtc.frame.minY, first.frame.minY, "The dragged line is now first")
+
+        // The Trains tabs lead with the line put first, and the list under them is its list.
+        app.buttons["Close"].firstMatch.tap()
+        app.buttons["tab-trains"].tap()
+        XCTAssertTrue(picker.waitForExistence(timeout: 30))
+        let tabs = picker.buttons.allElementsBoundByIndex
+        XCTAssertTrue(tabs.first?.label.contains("World Trade Center") ?? false, "First tab is \(tabs.first?.label ?? "none")")
+        XCTAssertTrue(app.buttons["column-worldTradeCenter"].waitForExistence(timeout: 10), "The page follows the tab that leads")
+        shot("27-tabs-reordered")
+
+        // Back to the standard order for later runs, and it is remembered across a launch.
+        app.terminate()
+        launch(tab: "widget")
+        openLines(expectFolded: false)
+        XCTAssertLessThan(wtc.frame.minY, first.frame.minY, "The order is remembered")
+        first.press(forDuration: 0.1, thenDragTo: wtc)
+        XCTAssertLessThan(first.frame.minY, wtc.frame.minY, "33rd Street leads again")
+
+        // Hiding a line is explained first. (Last: see the note in docs/todos.md about
+        // Settings not opening again once a guide has been shown.)
+        let newark = app.buttons["line-newark"].firstMatch
+        if !newark.isSelected { newark.tap() }
         newark.tap()
         XCTAssertTrue(app.buttons["guideDontShowAgain"].waitForExistence(timeout: 5), "Hiding a line is explained before it happens")
         shot("14-hide-line-guide")
@@ -498,9 +561,9 @@ final class PathGlanceUITests: XCTestCase {
         guard issue.waitForExistence(timeout: 20) else { return } // no issues at all today
         shot("15-issues")
         issue.tap()
-        let mute = app.buttons["muteButton"]
+        let mute = app.buttons["muteRow"]
         XCTAssertTrue(mute.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["sortUpdates"].exists)
+        reveal(mute)
         if mute.label.hasPrefix("Unmute") {
             mute.tap()
             confirmGuideIfShown()

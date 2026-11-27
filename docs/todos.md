@@ -31,6 +31,7 @@ Open work, in one list. No tickets, no board.
 	- Widget tab: drawings asked for underline tabs switching the preview between half and full width, and for a small one-slot widget; not decided (2026-11-25)
 	- Widget tab decided and built: Rectangle and Round shapes behind underline tabs, a preset carousel in place of the Presets row, a custom look per shape, five round presets (2026-11-26)
 	- Waiting for answers: shared settings first or last; the round presets' fonts and pairings; approval of the eleven rectangle presets (2026-11-26)
+	- "Shared settings first or last" no longer applies: lines and muted issues moved to Settings, favorite stops to the station list (2026-11-27)
 	- Add the round widget to a real lock screen and check it reads well at its real size (2026-11-26)
 
 ## After the look is final
@@ -54,6 +55,17 @@ Open work, in one list. No tickets, no board.
 	- [ ] Internal testers, then the external group, beta review and the public link (`l` in the script) (2026-11-23)
 	- [ ] Set TestFlight's "What to Test" through the API once the first upload works (2026-11-23)
 - [ ] GitHub CI workflow that runs the tests (2026-11-23)
+
+## Settings and Trains, feedback of 2026-11-27
+
+- [x] Two columns at least in the train list; station list with stars; Settings reworked (Preferences, Lines preferred with drag to reorder, text size follows the phone, Restore defaults keeps what is ticked); issue sheet matched to DA (2026-11-27)
+- [ ] Ask the owner whether "Standard" text size should be exactly the phone's size; today it is one step above (2026-11-27)
+- [ ] Check large accessibility sizes above accessibility1; the app stops there (2026-11-27)
+
+## Bugs found, not fixed
+
+- [ ] Settings does not open again once a guide has been shown from inside it and closed (seen with Restore defaults > Cancel and with the hide-line guide, in UI tests; the same happens on the commit before these changes). Relaunching clears it. Not yet tried by hand (2026-11-27)
+- [ ] Around 4 AM, at the largest text size, a short scroll on the train list lands on yesterday afternoon. `testHeaderGivesWayToTheDateWhenScrolled` fails on it at that hour. A guess, not checked: rows of the day before are laid out lazily above the first train of the day, and their real heights shift the list as they load (2026-11-27)
 
 ## Tests
 

@@ -4,6 +4,19 @@ A dated log, newest first: one line per decision and a link to the doc that owns
 
 Add a line here in the same change that rewrites the owning doc. A choice made from a drawing that is not built yet is marked **drawing only**.
 
+## 2026-11-27
+
+- The train list always shows at least two columns: your station and one more. A tap that would hide the last other column is refused with a shake and an error tap. Built. → [Trains](app/trains.md)
+- The station list is one popover, the same from the Trains title, the station button and Settings. Each station has a star that makes it a favorite stop without closing the list. Favorite stops leave the Widget tab. Built. → [Trains](app/trains.md), [UI](shared/ui.md)
+- Settings sheet reworked: no subtitle under its title; "Station" is "Preferences" and holds From, Location access and Muted issues; a new "Lines preferred" group follows it; no row is only text. Built. → [Widget](app/widget.md#settings-sheet)
+- "Lines shown" is "Lines preferred": it moved from the Widget tab to Settings, starts folded, and its rows can be dragged into the order you want. The order leads the Trains tabs, the rectangle widget's rows and the round widget's first line. Built. → [Widget](app/widget.md#settings-sheet)
+- With Lines, Muted issues and Favorite stops gone from the Widget tab, its "Both widgets" group is gone too, which settles the "shared settings first or last" question. → [Widget](app/widget.md)
+- Text size follows the phone: the slider adds steps to, or takes them from, the phone's own text size. Built. → [Widget](app/widget.md#settings-sheet)
+- Restore defaults asks what to keep: favorite stops, muted issues, lock screen presets. All three boxes start unticked every time. Built. → [Welcome note and guides](app/welcome-and-guides.md)
+- "Learned day types" is hidden until there is something in it. "Timetables" is folded into Schedule and only listed when there is more than one. Schedule's rows are "Last updated" and "Schedule". Built. → [Widget](app/widget.md#settings-sheet)
+- Issue sheet brought to the DA drawing: no subtitle, no sort row, no bell beside the X; the time PATH puts in front of its text is dropped, since the rail shows it; the day shows only when it is not today. Built. → [Issues](app/issues.md)
+- **The owner has not seen this one yet:** the app still draws one step above the phone's text size at "Standard", because that is the size every screen was designed and approved at. → [Widget](app/widget.md#open-questions)
+
 ## 2026-11-26
 
 - Two lock screen widgets: Rectangle (the existing one) and Round (one slot). Apple's WidgetKit has nothing wider than the rectangle, so a full-width widget is dropped. Round has five presets: Minutes, Clock time, Countdown ring, Next two, Two lines. Built. → [Widget](app/widget.md)

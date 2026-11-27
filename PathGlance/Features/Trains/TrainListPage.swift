@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// One destination's trains: the column names fixed on top, the days stacked in a card
 /// below. The rows come from `TrainListCache`, worked out off the main thread.
@@ -21,6 +22,8 @@ struct TrainListPage: View {
     @State private var topID: Double?
     /// Goes up each time the list is moved from here, so the rows take the new position.
     @State private var moves = 0
+    /// How many times a tap to hide each column has been turned down. Each one is a shake.
+    @State private var refusals: [Station: Int] = [:]
     @ScaledMetric(relativeTo: .subheadline) private var columnWidth: CGFloat = 76
 
     /// What the tab's header should show, while this is the list on screen.
@@ -64,7 +67,7 @@ struct TrainListPage: View {
 
                 let isAhead = list.isAhead(top: topID, now: now)
                 VStack(spacing: 0) {
-                    columnNames(columns: Array(visible.dropFirst(skipped)))
+                    columnNames(columns: Array(visible.dropFirst(skipped)), canHide: AppModel.canHideColumn(visible: visible.count))
                     // Equatable: scrolling changes `topID` many times a second, and the
                     // rows must not be laid out again for that.
                     TrainRows(list: list, origin: origin, target: target, skipped: skipped, hidesTarget: hidesTarget, moves: moves,
@@ -121,10 +124,28 @@ struct TrainListPage: View {
         }
     }
 
+    /// Hides a stop's column, unless that would leave your station's column on its own:
+    /// one column of times says where a train leaves and nothing about where it gets to.
+    private func hide(_ stop: Station) {
+        let hidesTarget = model.hiddenColumns.contains(target)
+        let visible = (list?.columns.count ?? 0) - (hidesTarget ? 1 : 0)
+        if AppModel.canHideColumn(visible: visible) {
+            model.hiddenColumns.insert(stop)
+        } else {
+            refuse(stop)
+        }
+    }
+
+    /// The name shakes and the phone gives its error tap: this column is not going anywhere.
+    private func refuse(_ stop: Station) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        withAnimation(.linear(duration: 0.4)) { refusals[stop, default: 0] += 1 }
+    }
+
     /// What a row's long-press menu asked for.
     private func handle(_ action: TrainRowAction) {
         switch action {
-        case .hideColumn(let stop): model.hiddenColumns.insert(stop)
+        case .hideColumn(let stop): hide(stop)
         case .unfavorite(let stop): model.toggleFavorite(stop)
         case .showHiddenColumns: model.hiddenColumns = []
         case .togglePeriod: model.showsPeriod.toggle()
@@ -161,7 +182,7 @@ struct TrainListPage: View {
     /// stop's column; the hidden ones wait in a line above, and a tap brings one back.
     /// The first column, your own station, always stays. The date is in the tab's header
     /// (`TrainsView`).
-    private func columnNames(columns: [Station]) -> some View {
+    private func columnNames(columns: [Station], canHide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             let hidden = hiddenStops
             if !hidden.isEmpty {
@@ -196,15 +217,20 @@ struct TrainListPage: View {
                     Spacer(minLength: 4)
                     TrainColumn(header: stop.shortName, sample: sampleTime, place: stop == columns.last ? .last : .middle) {
                         Button {
-                            withAnimation(.snappy) { _ = model.hiddenColumns.insert(stop) }
+                            if canHide {
+                                withAnimation(.snappy) { _ = model.hiddenColumns.insert(stop) }
+                            } else {
+                                refuse(stop)
+                            }
                         } label: {
                             Text(stop.shortName)
                                 .padding(.vertical, 6)
                                 .contentShape(.rect)
+                                .modifier(Shake(shakes: CGFloat(refusals[stop, default: 0])))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(stop.name)
-                        .accessibilityHint("Hides this column")
+                        .accessibilityHint(canHide ? "Hides this column" : "The last column next to your station always shows")
                         .accessibilityIdentifier("column-\(stop.rawValue)")
                     }
                 }

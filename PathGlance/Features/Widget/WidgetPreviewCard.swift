@@ -18,7 +18,7 @@ final class PreviewFeed: ObservableObject {
     /// The board the widgets would draw right now from `station`.
     func board(model: AppModel, station: Station, style: WidgetStyle) -> Board? {
         guard let schedule = model.schedule else { return nil }
-        var plan = BoardPlan(station: station, targets: BoardRules.widgetTargets(from: station, hidden: model.hiddenTargets),
+        var plan = BoardPlan(station: station, targets: BoardRules.widgetTargets(from: station, hidden: model.hiddenTargets, order: model.lineOrder),
                              schedule: schedule, now: now)
         plan.style = style
         plan.apply(realtime: arrivals, now: now)

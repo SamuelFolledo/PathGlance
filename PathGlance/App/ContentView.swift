@@ -5,6 +5,8 @@ import SwiftUI
 /// underneath it while it stays in view.
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
+    /// The phone's own text size, which the app follows.
+    @Environment(\.dynamicTypeSize) private var systemTextSize
 
     var body: some View {
         ZStack {
@@ -20,7 +22,7 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar()
         }
-        .dynamicTypeSize(model.textSize)
+        .dynamicTypeSize(AppModel.textSize(system: systemTextSize, offset: model.textSizeOffset))
     }
 
     private func page<Content: View>(_ tab: AppTab, @ViewBuilder content: () -> Content) -> some View {

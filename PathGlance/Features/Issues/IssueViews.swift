@@ -132,7 +132,7 @@ extension Issue {
     /// The issue as a banner: its title, PATH's latest words, and when they came.
     func banner(now: Date) -> IssueBannerItem {
         IssueBannerItem(id: id, symbol: kind.symbolName, color: kind.color, title: title,
-                        subtitle: latestMessage.isEmpty ? (updates.last?.subject ?? "") : latestMessage,
+                        subtitle: updates.last?.body ?? "",
                         time: latestTime(now: now))
     }
 
@@ -196,10 +196,6 @@ struct IssueDetailView: View {
     var relevance: IssueRelevance?
 
     @EnvironmentObject private var model: AppModel
-    /// Newest update first, or the order they were sent.
-    @State private var newestFirst = true
-    @State private var showsSort = false
-
     private var isMuted: Bool { model.mutedKinds.contains(issue.kind) }
 
     private var lines: [String] {
@@ -229,31 +225,11 @@ struct IssueDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            HStack {
-                Text(issue.updates.count == 1 ? "1 update" : "\(issue.updates.count) updates")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Button {
-                    showsSort = true
-                } label: {
-                    Label(newestFirst ? "Newest first" : "Oldest first", systemImage: "arrow.up.arrow.down")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.glass)
-                .accessibilityIdentifier("sortUpdates")
-                .popover(isPresented: $showsSort) {
-                    PopoverMenu {
-                        PopoverSectionTitle(title: "Sort updates")
-                        PopoverRadioRow(title: "Newest first", isOn: newestFirst) { newestFirst = true; showsSort = false }
-                        PopoverRadioRow(title: "Oldest first", isOn: !newestFirst) { newestFirst = false; showsSort = false }
-                    }
-                }
-            }
-            let updates = newestFirst ? Array(issue.updates.reversed()) : issue.updates
+            // Newest first, as PATH's own page lists them.
+            let updates = Array(issue.updates.reversed())
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(updates.enumerated()), id: \.element.id) { index, update in
-                    // The newest update is the filled dot, wherever the sort puts it.
+                    // The newest update is the filled dot.
                     RailRow(update: update, isNewest: update.id == issue.updates.last?.id && issue.isActive,
                             isFirst: index == 0, isLast: index == updates.count - 1)
                 }
@@ -282,8 +258,11 @@ private struct RailRow: View {
             VStack(alignment: .trailing, spacing: 0) {
                 Text(CompactTimes.clockWithPeriod(update.date))
                     .monospacedDigit()
-                Text(PathFormat.relativeDay(update.date, now: Date()))
-                    .font(.caption2)
+                // The day only when it is not today's.
+                if PathTime.ymd(of: update.date) != PathTime.ymd(of: Date()) {
+                    Text(PathFormat.relativeDay(update.date, now: Date()))
+                        .font(.caption2)
+                }
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -291,9 +270,11 @@ private struct RailRow: View {
             .minimumScaleFactor(0.7)
             .frame(width: timeWidth, alignment: .trailing)
 
-            Text(update.message.isEmpty ? update.subject : update.message)
+            Text(update.body)
                 .font(.subheadline)
                 .fontWeight(isNewest ? .semibold : .regular)
+                // Every word of it: an update is never cut short.
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, Theme.Spacing.md + 12)
                 .padding(.bottom, isLast ? 0 : Theme.Spacing.lg)
@@ -316,26 +297,6 @@ private struct RailRow: View {
                 }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// The bell beside a sheet's X that silences every issue of one kind. Press and hold for
-/// what it does.
-struct MuteButton: View {
-    let kind: IssueKind
-
-    @EnvironmentObject private var model: AppModel
-
-    private var isMuted: Bool { model.mutedKinds.contains(kind) }
-
-    var body: some View {
-        RoundButton(symbol: isMuted ? "bell.slash.fill" : "bell.fill",
-                    label: isMuted ? "Unmute \(kind.pluralTitle.lowercased())" : "Mute \(kind.pluralTitle.lowercased())",
-                    isOn: isMuted, identifier: "muteButton") { model.toggleMute(kind) }
-            .infoPopover(isMuted ? "Muted" : "Mute",
-                         "Silences every issue of this kind (\(kind.pluralTitle.lowercased())), not just this one.",
-                         "Muted issues stay listed here but leave the Issues badge and the lock screen widget.",
-                         "Tap again to unmute.")
     }
 }
 
@@ -388,9 +349,7 @@ struct IssuesView: View {
                 withAnimation { reader.scrollTo("top", anchor: .top) }
             }
         }
-        .appSheet(item: $selected, title: { $0.title },
-                  subtitle: { _ in "Every update PATH sent about this." },
-                  accessory: { AnyView(MuteButton(kind: $0.kind)) }) { issue in
+        .appSheet(item: $selected, title: { $0.title }) { issue in
             IssueDetailView(issue: issue, relevance: IssueMatcher.relevance(of: issue, station: model.station(nearest: location.station), target: nil))
         }
     }

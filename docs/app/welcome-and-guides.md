@@ -32,10 +32,10 @@ A fuller onboarding (a swipeable carousel, one page per point, each with a pictu
 | `id` | Raised from | Title | Buttons | Can be silenced |
 |---|---|---|---|---|
 | `change-station` | `StationMenu` (Trains title, station button) | "Start from \<station\>?" | Cancel · Change | yes |
-| `hide-line` | Widget > Lines shown (`LinesShownRows`) | "Hide trains to \<station\>?" | Cancel · Hide | yes |
-| `clear-favorites` | Widget > Favorite stops > Clear all | "Clear all favorite stops?" | Cancel · Clear (destructive) | yes |
-| `mute-issues` | The bell in an issue's sheet | "Mute \<kind, plural\>?" | Cancel · Mute | yes |
-| `unmute-elevator` | The bell, unmuting elevator notices | "Unmute elevator and escalator notices?" | Cancel · Unmute | yes |
+| `hide-line` | Settings > Lines preferred (`LinesPreferredRows`) | "Hide trains to \<station\>?" | Cancel · Hide | yes |
+| `clear-favorites` | Station list > Clear favorite stops (`AppModel.clearFavorites`) | "Clear all favorite stops?" | Cancel · Clear (destructive) | yes |
+| `mute-issues` | "Mute alerts like this" in an issue's sheet | "Mute \<kind, plural\>?" | Cancel · Mute | yes |
+| `unmute-elevator` | The same row, unmuting elevator notices | "Unmute elevator and escalator notices?" | Cancel · Unmute | yes |
 | `restore-defaults` | Settings > Restore defaults | "Restore defaults?" | Cancel · Restore (destructive) | no |
 
 ### Points, as in code
@@ -71,3 +71,9 @@ A fuller onboarding (a swipeable carousel, one page per point, each with a pictu
 ## Open questions
 
 - **Welcome note redesign**, once the app's look is final: scrollable, several pages, an image or screenshot separating each point, a bigger title. Recorded in [todos](../todos.md); not built.
+
+## Boxes to tick before confirming
+
+A guide can carry `options`: square check boxes above its buttons, all unticked each time it opens, handed to `onConfirm` when the confirming button is tapped. Restore defaults is the one that has them: "Keep favorite stops", "Keep muted issues", "Keep lock screen presets". (2026-11-27)
+
+What Restore defaults always resets, whatever is ticked: the station, the lines preferred and their order, text size, hidden columns (unless favorite stops are kept), folded sections, banners put away today, and every "Don't show this again". What it never touches: the timetable, the issue history and the learned day types.

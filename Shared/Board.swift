@@ -120,24 +120,42 @@ extension BoardRules {
     /// The ends of the lines, which is what a destination tab or widget line can be.
     static let terminals: [Station] = [.thirtyThirdStreet, .worldTradeCenter, .journalSquare, .hoboken, .newark]
 
+    /// `order` with anything that is not a terminal dropped and every missing terminal
+    /// added at the end, so a stored order survives a change to the list.
+    static func completed(_ order: [Station]) -> [Station] {
+        var result: [Station] = []
+        for station in order + terminals where terminals.contains(station) && !result.contains(station) {
+            result.append(station)
+        }
+        return result
+    }
+
+    /// `stations` in the user's preferred order. The standard order changes nothing.
+    static func arranged(_ stations: [Station], by order: [Station]) -> [Station] {
+        let order = completed(order)
+        guard order != terminals else { return stations }
+        return stations.sorted { (order.firstIndex(of: $0) ?? order.count) < (order.firstIndex(of: $1) ?? order.count) }
+    }
+
     /// The widget's lines: the station's rules without the destinations the user has
-    /// turned off. If that would leave nothing, the rules stand.
-    static func widgetTargets(from station: Station, hidden: Set<Station>) -> [Station] {
+    /// turned off, in the user's order. If that would leave nothing, the rules stand.
+    static func widgetTargets(from station: Station, hidden: Set<Station>, order: [Station] = terminals) -> [Station] {
         let rules = targets(from: station)
         let kept = rules.filter { !hidden.contains($0) }
-        return kept.isEmpty ? rules : kept
+        return arranged(kept.isEmpty ? rules : kept, by: order)
     }
 
     /// The destination tabs in the app: the widget's lines, then the other stations where
     /// trains from `station` end, without the ones turned off. Hoboken is not a tab at
-    /// Journal Square: trains only pass through it there.
-    static func destinations(from station: Station, hidden: Set<Station>, schedule: ScheduleData) -> [Station] {
+    /// Journal Square: trains only pass through it there. A preferred order of the user's
+    /// own sorts all of them together.
+    static func destinations(from station: Station, hidden: Set<Station>, order: [Station] = terminals, schedule: ScheduleData) -> [Station] {
         var result = widgetTargets(from: station, hidden: hidden)
         let ends = schedule.terminals(from: station)
         for terminal in terminals where !result.contains(terminal) && !hidden.contains(terminal) && ends.contains(terminal) {
             result.append(terminal)
         }
-        return result
+        return arranged(result, by: order)
     }
 }
 

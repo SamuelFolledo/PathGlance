@@ -93,12 +93,35 @@ enum SharedStore {
     /// Every setting kept here, for "Restore defaults".
     static let preferenceKeys = ["manualStation", "useRealtime", "mutedIssueKinds", "favoriteStops", "hiddenTargets",
                                  "widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle",
-                                 "roundContent", "roundFont", "roundLine"]
+                                 "roundContent", "roundFont", "roundLine", "lineOrder"]
 
-    static func restoreDefaults() {
-        for key in preferenceKeys {
+    /// What "Restore defaults" can be told to leave alone.
+    enum Kept: String, CaseIterable, Sendable {
+        case favoriteStops, mutedIssues, presets
+
+        /// The keys here that hold it.
+        var keys: Set<String> {
+            switch self {
+            case .favoriteStops: return ["favoriteStops"]
+            case .mutedIssues: return ["mutedIssueKinds"]
+            case .presets: return ["widgetDensity", "widgetTimeFormat", "showArrivalOnWidget", "widgetMaxTimes", "fontStyle",
+                                   "roundContent", "roundFont", "roundLine"]
+            }
+        }
+    }
+
+    static func restoreDefaults(keeping kept: Set<Kept> = []) {
+        let spared = kept.reduce(into: Set<String>()) { $0.formUnion($1.keys) }
+        for key in preferenceKeys where !spared.contains(key) {
             defaults.removeObject(forKey: key)
         }
+    }
+
+    /// The lines in the order the user prefers them, every terminal once. It orders the
+    /// destination tabs, the widget's rows and the round widget's first line.
+    static var lineOrder: [Station] {
+        get { BoardRules.completed((defaults.stringArray(forKey: "lineOrder") ?? []).compactMap(Station.init(rawValue:))) }
+        set { defaults.set(newValue.map(\.rawValue), forKey: "lineOrder") }
     }
 
     /// Stops the user cares about. The Trains tab shows a column of arrival times for each.

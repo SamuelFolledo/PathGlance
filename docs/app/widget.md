@@ -60,7 +60,7 @@ Source: `RoundPreset.builtIn`; the wording is worked out by `RoundFace.make`. Un
 
 ## Look settings
 
-Each group is a `FoldCard` that folds away and remembers it; folded, it shows its current value. The shape's own groups come first, right under the carousel, because they change the preview above them. Then a "Both widgets" heading and the three groups both shapes share, the same rows with the same values on either page. (built 2026-11-26. **Shared groups last is a default waiting for the owner's answer.**)
+Each group is a `FoldCard` that folds away and remembers it; folded, it shows its current value. Only the shape's own groups are here. What both shapes share (the lines, muted issues) is in the Settings sheet, and favorite stops are starred in the station list. (2026-11-27)
 
 Rectangle:
 
@@ -72,12 +72,6 @@ Round:
 
 - **Font:** the same five.
 - **Line:** "First line shown", or one destination for the circle to follow. At a station that line does not leave from, it follows the first line shown. It is not part of the look: it takes effect at once, without Save, and does not make a preset custom.
-
-Both widgets:
-
-- **Lines shown:** one check per destination. Hiding one raises the `hide-line` guide.
-- **Muted issues:** one check per issue kind.
-- **Favorite stops:** listed here inline, the same data as the Trains tab's columns (`FavoriteStopsView`); it does not switch tab or open a sheet. "Clear all" raises `clear-favorites`. (decided 2026-11-23)
 
 ## The widgets themselves
 
@@ -92,18 +86,23 @@ Both read the same station, live times and issues (`BoardProvider.plan`).
 
 Opened by the menu button (`SettingsSheet`). Groups, top to bottom:
 
-- **Station:** From (Nearest or a station), Detected, Location access; "Turn on location in Settings" when access is denied.
-- **Schedule:** the timetable in use and when it was checked.
-- **Text size:** steps for text throughout the app; the widget has its own Size.
-- **Timetables:** every distinct timetable downloaded (`ArchiveViews.swift`).
-- **Learned day types:** what the app has worked out about holidays.
+- **Preferences** (was "Station"):
+	- **From \<station\>**, with where it comes from and what the phone last found nearest on the line under it. Opens the station list.
+	- **Location access**, with its state under it. A tap asks for the next step up: While Using, then Always. iOS asks each of those once, so after that, and when access is off, the tap opens the Settings app. With Always it reads "Always allowed" and does nothing.
+	- **Muted issues**, with the muted kinds under it. A tap opens the checks in place. (moved from the Widget tab 2026-11-27)
+- **Lines preferred** (was "Lines shown" on the Widget tab): a row per line with a drag handle, then a round check (`LinesPreferredRows`). Starts folded. Dragging sets the order of the Trains tabs, the rectangle widget's rows and the round widget's first line; the check hides a line from all three and raises `hide-line`. It is one list in `AppModel` (`lineOrder`, `hiddenTargets`), stored in the App Group so the widgets read the same one. The order never adds a line to a widget: it only arranges the lines the station's rules give it. The standard order leaves every station exactly as it was. (2026-11-27)
+- **Schedule:** "Last updated" and "Schedule" (the timetable's name), and "Update schedule now". When more than one timetable has been downloaded, they are listed below with the days each was in use; one alone is just the one already named. (2026-11-27)
+- **Text size:** the app follows the phone's text size. The slider moves it up to three steps either way from there, and "Back to standard" returns to following it (`AppModel.textSize(system:offset:)`). It stops at the smallest and largest sizes the layouts are made for. The widgets have their own Size. (2026-11-27)
+- **Learned day types:** which timetable PATH really ran on each day, worked out by the widget from live arrivals. Hidden until there is at least one day in it. (2026-11-27)
 - **Support the app:** Buy Me a Coffee, PayPal, Venmo, Cash App. Each opens outside the app; nothing is locked behind a tip. (decided 2026-11-23)
-- **About:** Email the developer, Report a problem, Share, Help, Privacy policy, Welcome note, Version, Developer, and the not-affiliated disclaimer (`AppInfo`).
-- **Restore defaults:** always asks (`restore-defaults` guide, cannot be silenced).
+- **About:** Email the developer, Report a problem, Share, Help, Privacy policy, Welcome note, then one block of text with the version, the developer and the not-affiliated disclaimer (`AppInfo`).
+- **Restore defaults:** always asks (`restore-defaults` guide, cannot be silenced), with three boxes for what to keep: favorite stops, muted issues, lock screen presets. All start unticked each time. (2026-11-27)
+
+The sheet has no subtitle under its title, and no row that is only text: what a row is set to sits on a second line under its title (`DetailRow`). (2026-11-27)
 
 ## Open questions
 
-- **Shared settings first or last?** They are last. The owner asked whether they should sit right under the preview.
+- **Text size at "Standard":** the app draws one step above the phone's own size, because every screen was designed and approved at that size. The owner has not been asked whether "Standard" should be exactly the phone's size.
 - **Round presets' fonts and pairings** with the rectangle presets, as drawn on the design page's Review tab.
 - **The eleven rectangle presets** still wait for approval.
 - **Not seen on a real lock screen:** the round widget has only been drawn in the app's preview.

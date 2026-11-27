@@ -92,7 +92,7 @@ struct BoardProvider: TimelineProvider {
             schedule.dayOverrides = dayTypes.overrides(around: now)
         }
 
-        let targets = BoardRules.widgetTargets(from: station, hidden: SharedStore.hiddenTargets)
+        let targets = BoardRules.widgetTargets(from: station, hidden: SharedStore.hiddenTargets, order: SharedStore.lineOrder)
         var plan = BoardPlan(station: station, targets: targets, schedule: schedule, now: now)
         plan.style = style
         plan.apply(realtime: arrivals, now: now)

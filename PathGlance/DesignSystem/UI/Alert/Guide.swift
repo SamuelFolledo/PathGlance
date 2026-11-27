@@ -16,7 +16,16 @@ struct Guide: Identifiable {
     var canBeSilenced = true
     /// Shows the points as a numbered list (1., 2., ...) instead of plain paragraphs.
     var isNumbered = false
+    /// Boxes to tick before confirming, all unticked each time the guide opens.
+    var options: [Option] = []
+    /// Runs in place of `action` when the guide has options, with the ids ticked.
+    var onConfirm: ((Set<String>) -> Void)?
     let action: () -> Void
+
+    struct Option: Identifiable, Hashable {
+        let id: String
+        let title: String
+    }
 
     private static let key = "silencedGuides"
 
@@ -103,6 +112,7 @@ struct GuideView: View {
     let close: () -> Void
 
     @State private var dontShowAgain = false
+    @State private var chosen: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -122,6 +132,14 @@ struct GuideView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(guide.isNumbered ? "\(index + 1). \(point)" : point)
             }
+            ForEach(guide.options) { option in
+                CheckRow(isOn: chosen.contains(option.id), shape: .square) {
+                    if chosen.contains(option.id) { chosen.remove(option.id) } else { chosen.insert(option.id) }
+                } label: {
+                    Text(option.title)
+                }
+                .accessibilityIdentifier("guideOption-\(option.id)")
+            }
             if guide.canBeSilenced {
                 CheckRow(isOn: dontShowAgain, shape: .square) {
                     dontShowAgain.toggle()
@@ -137,7 +155,7 @@ struct GuideView: View {
                 WideButton(title: guide.confirm, role: guide.isDestructive ? .destructive : nil, isProminent: true, identifier: "guideConfirm") {
                     if dontShowAgain { Guide.silence(guide.id) }
                     close()
-                    guide.action()
+                    if let onConfirm = guide.onConfirm { onConfirm(chosen) } else { guide.action() }
                 }
             }
             .padding(.top, 4)

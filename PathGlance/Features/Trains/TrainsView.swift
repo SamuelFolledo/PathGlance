@@ -49,6 +49,7 @@ struct TrainsView: View {
     private struct WaitKey: Hashable {
         var origin: Station
         var hidden: Set<Station>
+        var order: [Station]
         var imported: Date?
         var now: Date
         var arrivalCount: Int
@@ -60,7 +61,7 @@ struct TrainsView: View {
     }
 
     private func destinations(_ schedule: ScheduleData) -> [Station] {
-        BoardRules.destinations(from: origin, hidden: model.hiddenTargets, schedule: schedule)
+        BoardRules.destinations(from: origin, hidden: model.hiddenTargets, order: model.lineOrder, schedule: schedule)
     }
 
     private func selected(in destinations: [Station]) -> Station? {
@@ -138,7 +139,7 @@ struct TrainsView: View {
                 model.jump(to: date)
             }
         }
-        .task(id: WaitKey(origin: origin, hidden: model.hiddenTargets, imported: model.schedule?.importedAt, now: now,
+        .task(id: WaitKey(origin: origin, hidden: model.hiddenTargets, order: model.lineOrder, imported: model.schedule?.importedAt, now: now,
                           arrivalCount: arrivals.count, firstArrival: arrivals.first?.arrival)) {
             updateWaits()
         }
@@ -174,8 +175,7 @@ struct TrainsView: View {
     }
 
     private func sheetAccessory(_ sheet: Sheet) -> AnyView? {
-        if case .issue(let issue, _) = sheet { return AnyView(MuteButton(kind: issue.kind)) }
-        return nil
+        nil
     }
 
     // MARK: Banners
@@ -216,7 +216,7 @@ struct TrainsView: View {
         switch sheet {
         case .favorites: return "Each checked stop gets a column of arrival times in the train list."
         case .stops, .note: return nil
-        case .issue: return "Every update PATH sent about this."
+        case .issue: return nil
         }
     }
 
@@ -371,6 +371,11 @@ struct TrainsView: View {
             }
             .onChange(of: origin) {
                 page = selected(in: self.destinations(schedule))
+            }
+            .onChange(of: destinations) { _, changed in
+                // Lines were put in another order or hidden: the page follows the tab
+                // that is underlined, wherever it now sits.
+                page = selected(in: changed)
             }
             .onAppear {
                 if page == nil { page = current }

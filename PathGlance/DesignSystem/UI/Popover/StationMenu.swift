@@ -1,9 +1,10 @@
 import SwiftUI
 import CoreLocation
 
-/// The popover for choosing the "from" station, shared by the Trains title and the
-/// station button beside the tab bar. With location access it offers the nearest
-/// station; without, the choice made here is remembered. Also the way in to favorite stops.
+/// The popover for choosing the "from" station, the same wherever it opens: the Trains
+/// title, the station button beside the tab bar, and Settings. With location access it
+/// offers the nearest station; without, the choice made here is remembered. The star on
+/// each station makes it a favorite stop without closing the menu.
 struct StationMenu: View {
     @Binding var isShowing: Bool
 
@@ -59,17 +60,26 @@ struct StationMenu: View {
             PopoverSectionTitle(title: hasLocation ? "Always from" : "From")
             ForEach(Station.allCases) { station in
                 // The station in use is marked, whether it was picked or is the nearest.
-                PopoverRadioRow(title: station.name, isOn: station == current) {
+                // The star makes it a favorite stop, with its own column of arrival times.
+                // It is its own button: the menu stays open and the station is not changed.
+                let isFavorite = model.favoriteStops.contains(station)
+                PopoverRadioRow(title: station.name, isOn: station == current,
+                                accessory: PopoverAccessory(symbol: isFavorite ? "star.fill" : "star", isOn: isFavorite,
+                                                            label: isFavorite ? "Remove \(station.name) from favorite stops" : "Add \(station.name) to favorite stops",
+                                                            identifier: "star-\(station.rawValue)") {
+                    model.toggleFavorite(station)
+                }, identifier: "station-\(station.rawValue)") {
                     choose(station)
                 }
-                .accessibilityIdentifier("station-\(station.rawValue)")
             }
-            Divider().padding(.vertical, Theme.Spacing.xs)
-            PopoverActionRow(title: "Favorite stops", symbol: model.favoriteStops.isEmpty ? "star" : "star.fill") {
-                isShowing = false
-                model.editFavorites()
+            if !model.favoriteStops.isEmpty {
+                Divider().padding(.vertical, Theme.Spacing.xs)
+                PopoverActionRow(title: "Clear favorite stops", symbol: "star.slash", isDestructive: true) {
+                    isShowing = false
+                    model.clearFavorites()
+                }
+                .accessibilityIdentifier("menuClearFavorites")
             }
-            .accessibilityIdentifier("menuFavoriteStops")
         }
     }
 }

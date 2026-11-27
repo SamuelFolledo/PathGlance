@@ -45,6 +45,23 @@ struct IssueUpdate: Codable, Hashable, Identifiable, Sendable {
     var date: Date
     var subject: String
     var message: String
+
+    /// What PATH said, without the time it puts in front ("04:12 PM: "): the app shows
+    /// the time itself. A message that is empty falls back to the subject.
+    var body: String {
+        let text = IssueUpdate.withoutLeadingTime(message)
+        return text.isEmpty ? subject : text
+    }
+
+    /// Drops a clock time, with an optional date before it, from the start of `text`:
+    /// "04:12 PM: ", "4:12PM - ", "11/21 04:12 PM: ".
+    static func withoutLeadingTime(_ text: String) -> String {
+        let pattern = #"^\s*(\d{1,2}/\d{1,2}(/\d{2,4})?\s+)?\d{1,2}:\d{2}\s*([AaPp]\.?[Mm]\.?)?\s*[:\-–]\s*"#
+        guard let range = text.range(of: pattern, options: .regularExpression) else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 /// A PATH alert thread (one incident and its updates), or a delay the app noticed itself

@@ -42,7 +42,7 @@ WTC 7:08 :14 :20 :26 :32
 
 ## What each station shows
 
-These are the defaults. Widget > Lines shown turns destinations off; a station left
+These are the defaults. Settings > Lines preferred puts them in your order and turns destinations off; a station left
 with one line gives it both widget rows. When the same trains serve both destinations
 they are listed once under a joint label such as `JSQ+HOB`.
 

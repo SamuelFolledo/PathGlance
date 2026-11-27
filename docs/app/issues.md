@@ -28,10 +28,10 @@ Ended issues, grouped by day ("Archived · Sun, Nov 22, 2026"), each with its st
 Tapping an issue, here or on a Trains banner, opens design DA (`IssueDetailView`). (decided 2026-11-25, built 2026-11-26)
 
 - **Tags:** "Your station" or "Your line" when the text names one (`IssueMatcher`), the kind, each line with its map colour, and "Still open" or when it ended.
-- **Time rail:** every update PATH sent about the incident, newest first, each with its time; the newest of an open issue has the filled dot. PATH's feed gives every update of one incident the same id, so the rail is real history, not a guess. The order can be flipped.
-- **Mute alerts like this** at the bottom does what the bell does.
-
-- **Bell** beside the X (`RoundButton`): mutes or unmutes every issue of this kind. Muting raises the `mute-issues` guide. Unmuting just happens, except for elevator notices, which raise `unmute-elevator` because they start muted for a reason. See [guides](welcome-and-guides.md).
+- **Time rail:** every update PATH sent about the incident, newest first, each with its time on the left; the day is added only when it is not today. The newest of an open issue has the filled dot. PATH's feed gives every update of one incident the same id, so the rail is real history, not a guess.
+- **PATH's own time is dropped.** PATH starts each message with the time ("04:12 PM: JSQ-33 delayed"). The rail already shows it, so the text starts after it (`IssueUpdate.body`). The banners do the same. (decided 2026-11-27)
+- **Mute alerts like this** at the bottom mutes or unmutes every issue of this kind. Muting raises the `mute-issues` guide. Unmuting just happens, except for elevator notices, which raise `unmute-elevator` because they start muted for a reason. See [guides](welcome-and-guides.md).
+- **Not there, on purpose:** a subtitle under the title, a sort button, and a bell beside the X. The drawing has none of them, and the row at the bottom does the bell's job. (removed 2026-11-27)
 
 ## Open questions
 

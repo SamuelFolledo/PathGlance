@@ -14,13 +14,27 @@ final class AppModel: ObservableObject {
     nonisolated static let daysBack = 7
     nonisolated static let daysAhead = 14
 
-    /// The text sizes the slider in Settings steps through. The app starts one step above
-    /// the system's standard size.
+    /// The text sizes the layouts are made for, smallest first.
     static let textSizes: [DynamicTypeSize] = [.small, .medium, .large, .xLarge, .xxLarge, .xxxLarge, .accessibility1]
-    nonisolated static let defaultTextSizeStep = 3
+    /// The app draws one step above the phone's text size: that is the look it was
+    /// designed at. The slider in Settings adds to or takes from that.
+    nonisolated static let baseTextSizeBoost = 1
+    nonisolated static let textSizeOffsets = -3...3
 
-    var textSize: DynamicTypeSize {
-        AppModel.textSizes[min(max(textSizeStep, 0), AppModel.textSizes.count - 1)]
+    /// The size the app draws at: the phone's own size, moved by the app's boost and the
+    /// user's offset, kept within the sizes the layouts are made for.
+    nonisolated static func textSize(system: DynamicTypeSize, offset: Int) -> DynamicTypeSize {
+        let all = DynamicTypeSize.allCases
+        let sizes: [DynamicTypeSize] = [.small, .medium, .large, .xLarge, .xxLarge, .xxxLarge, .accessibility1]
+        let lowest = all.firstIndex(of: sizes[0]) ?? 0
+        let highest = all.firstIndex(of: sizes[sizes.count - 1]) ?? all.count - 1
+        let start = min(max(all.firstIndex(of: system) ?? lowest, lowest), highest)
+        return all[min(max(start + baseTextSizeBoost + offset, lowest), highest)]
+    }
+
+    /// "Standard", "+1", "−2": the offset as the Settings sheet names it.
+    nonisolated static func textSizeName(offset: Int) -> String {
+        offset == 0 ? "Standard" : (offset > 0 ? "+\(offset)" : "−\(-offset)")
     }
 
     @Published private(set) var schedule: ScheduleData?
@@ -64,9 +78,10 @@ final class AppModel: ObservableObject {
         didSet { SharedStore.mutedKinds = mutedKinds; reloadWidgets() }
     }
 
-    /// Text size across the app, as a step on `AppModel.textSizes`.
-    @Published var textSizeStep: Int {
-        didSet { UserDefaults.standard.set(textSizeStep, forKey: "textSizeStep") }
+    /// Steps added to (or taken from) the phone's text size across the app. 0 follows
+    /// the phone.
+    @Published var textSizeOffset: Int {
+        didSet { UserDefaults.standard.set(textSizeOffset, forKey: "textSizeOffset") }
     }
 
     /// A question waiting for the user's answer (`ask`).
@@ -182,6 +197,9 @@ final class AppModel: ObservableObject {
     /// Made-up issues for screenshots and UI tests ("-sampleBanners YES"). Never saved.
     private(set) var sampleIssues: [Issue] = []
 
+    /// Sections that start folded on a fresh install.
+    nonisolated static let defaultFoldedSections: Set<String> = ["settings-lines"]
+
     /// Sections the user has folded away, by name. Remembered between launches.
     @Published var foldedSections: Set<String> {
         didSet { UserDefaults.standard.set(Array(foldedSections), forKey: "foldedSections") }
@@ -197,12 +215,24 @@ final class AppModel: ObservableObject {
         didSet { SharedStore.hiddenTargets = hiddenTargets; reloadWidgets() }
     }
 
+    /// The lines in the order the user prefers. It orders the destination tabs, the
+    /// widget's rows and the round widget's first line.
+    @Published var lineOrder: [Station] {
+        didSet {
+            guard lineOrder != oldValue else { return }
+            SharedStore.lineOrder = lineOrder
+            reloadWidgets()
+        }
+    }
+
     init() {
         schedule = SharedStore.loadSchedule()
         issues = IssueLog.load()
         manualStation = SharedStore.manualStation
         mutedKinds = SharedStore.mutedKinds
-        textSizeStep = UserDefaults.standard.object(forKey: "textSizeStep") as? Int ?? AppModel.defaultTextSizeStep
+        // The older absolute step ("textSizeStep") is dropped: the app now follows the phone.
+        let offset = UserDefaults.standard.object(forKey: "textSizeOffset") as? Int ?? 0
+        textSizeOffset = min(max(offset, AppModel.textSizeOffsets.lowerBound), AppModel.textSizeOffsets.upperBound)
         look = SharedStore.widgetLook
         savedLook = SharedStore.widgetLook
         // The one custom look older builds kept is the rectangle's.
@@ -213,12 +243,19 @@ final class AppModel: ObservableObject {
         roundLine = SharedStore.roundLine
         hiddenColumns = Set((UserDefaults.standard.stringArray(forKey: "hiddenColumns") ?? []).compactMap(Station.init(rawValue:)))
         showsPeriod = UserDefaults.standard.object(forKey: "showsPeriod") as? Bool ?? true
-        foldedSections = Set(UserDefaults.standard.stringArray(forKey: "foldedSections") ?? [])
+        var folded = UserDefaults.standard.stringArray(forKey: "foldedSections").map(Set.init) ?? AppModel.defaultFoldedSections
+        // Sections added since start folded once, for people who already have a saved set.
+        if !UserDefaults.standard.bool(forKey: "foldedNewSectionsOnce") {
+            folded.formUnion(AppModel.defaultFoldedSections)
+            UserDefaults.standard.set(true, forKey: "foldedNewSectionsOnce")
+        }
+        foldedSections = folded
         let today = PathTime.ymd(of: Date())
         dismissedBanners = ((UserDefaults.standard.dictionary(forKey: "dismissedBanners") as? [String: Int]) ?? [:]).filter { $0.value == today }
         if UserDefaults.standard.bool(forKey: "sampleBanners") { sampleIssues = Issue.samples(now: Date()) }
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
+        lineOrder = SharedStore.lineOrder
         // "-startTab issues" on the command line opens on that tab, for screenshots and UI tests.
         switch UserDefaults.standard.string(forKey: "startTab") {
         case "issues": tab = .issues
@@ -315,32 +352,45 @@ final class AppModel: ObservableObject {
         guide = .welcome
     }
 
-    /// Puts every preference back the way a fresh install has it. The timetable, the
-    /// issue log and what the app has learned about holidays are kept.
-    func restoreDefaults() {
-        SharedStore.restoreDefaults()
+    /// Puts every preference back the way a fresh install has it, except what is in
+    /// `kept`. The timetable, the issue log and what the app has learned about holidays
+    /// are never touched.
+    func restoreDefaults(keeping kept: Set<SharedStore.Kept> = []) {
+        SharedStore.restoreDefaults(keeping: kept)
         Guide.showAllAgain()
-        for key in ["textSizeStep", "customWidgetPreset", "customRoundPreset", "hiddenColumns", "showsPeriod", "foldedSections", "dismissedBanners"] {
+        var keys = ["textSizeStep", "textSizeOffset", "showsPeriod", "foldedSections", "dismissedBanners", "askedForAlways"]
+        if !kept.contains(.presets) { keys += ["customWidgetPreset", "customRoundPreset"] }
+        if !kept.contains(.favoriteStops) { keys.append("hiddenColumns") }
+        for key in keys {
             UserDefaults.standard.removeObject(forKey: key)
         }
         manualStation = SharedStore.manualStation
         mutedKinds = SharedStore.mutedKinds
         look = SharedStore.widgetLook
         savedLook = SharedStore.widgetLook
-        customPreset = nil
         roundLook = SharedStore.roundLook
         savedRoundLook = SharedStore.roundLook
-        customRoundPreset = nil
-        roundLine = nil
-        hiddenColumns = []
+        roundLine = SharedStore.roundLine
+        if !kept.contains(.presets) {
+            customPreset = nil
+            customRoundPreset = nil
+        }
+        if !kept.contains(.favoriteStops) { hiddenColumns = [] }
         showsPeriod = true
-        foldedSections = []
+        foldedSections = AppModel.defaultFoldedSections
         dismissedBanners = [:]
-        reloadWidgets()
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
-        textSizeStep = AppModel.defaultTextSizeStep
+        lineOrder = SharedStore.lineOrder
+        textSizeOffset = 0
         visitingStation = nil
+        reloadWidgets()
+    }
+
+    /// Whether hiding one more column would leave the train list with fewer than two:
+    /// the user's own station and at least one arrival column always show.
+    nonisolated static func canHideColumn(visible: Int) -> Bool {
+        visible > 1
     }
 
     /// Moves every train list to `date`.
@@ -356,6 +406,23 @@ final class AppModel: ObservableObject {
         } else {
             favoriteStops.append(station)
         }
+    }
+
+    /// Asks first, then drops every favorite stop and its column.
+    func clearFavorites() {
+        ask(Guide(
+            id: "clear-favorites",
+            title: "Clear all favorite stops?",
+            points: [
+                "The train list goes back to two columns: your station and the destination.",
+                "You can pick favorites again at any time, with the star beside a station.",
+            ],
+            confirm: "Clear",
+            isDestructive: true
+        ) {
+            self.favoriteStops = []
+            self.hiddenColumns = []
+        })
     }
 
     func setTarget(_ station: Station, shown: Bool) {
