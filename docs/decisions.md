@@ -6,6 +6,8 @@ Add a line here in the same change that rewrites the owning doc. A choice made f
 
 ## 2026-11-27
 
+- Issues tab is IG's line tabs with IH-b's content: a tab per line (the two Hoboken lines share one), the line as its stops, every update written out at the stop, tap for the sheet. Unplaced issues go under "Other" on every tab; ended ones are one "Archived" row. Built. → [Issues](app/issues.md)
+- Every child of the train list is one fixed height, late trains included. A shorter heading or taller late row made the lazy list misjudge the rows above and jump hours back on the first scroll. → [Trains](app/trains.md)
 - The train list always shows at least two columns: your station and one more. A tap that would hide the last other column is refused with a shake and an error tap. Built. → [Trains](app/trains.md)
 - The station list is one popover, the same from the Trains title, the station button and Settings. Each station has a star that makes it a favorite stop without closing the list. Favorite stops leave the Widget tab. Built. → [Trains](app/trains.md), [UI](shared/ui.md)
 - Settings sheet reworked: no subtitle under its title; "Station" is "Preferences" and holds From, Location access and Muted issues; a new "Lines preferred" group follows it; no row is only text. Built. → [Widget](app/widget.md#settings-sheet)

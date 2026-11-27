@@ -13,7 +13,8 @@ Things that might be worth doing and that nobody has agreed to yet. Nothing here
 
 ## Issues
 
-- Match each issue to a station, a line or a direction by reading PATH's wording, so the list can be sorted by what affects you (drawings IG to IM) (2026-11-25)
+- Read direction out of PATH's wording, so an issue can be shown only for the way you are going (drawing IM). Stations and lines are read already and the Issues tab is laid out by them (built 2026-11-27)
+- Fold older updates of a long incident on the Issues tab, showing the newest and a count (drawing IH) (2026-11-27)
 - A history rail on a station issue: how often this elevator has been out in the past week (drawing DB; DA was preferred 2026-11-25)
 
 ## Widget

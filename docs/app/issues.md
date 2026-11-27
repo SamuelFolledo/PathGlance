@@ -1,27 +1,56 @@
 # Issues
 
-> **Where:** second tab · **Code:** `PathGlance/Features/Issues/IssueViews.swift` · data: `IssueLog`, `IssueKind` (`Shared/Issues.swift`)
+> **Where:** second tab · **Code:** `PathGlance/Features/Issues/IssuesView.swift` (the tab), `IssueViews.swift` (rows, the sheet) · data: `IssueLog`, `IssueKind` (`Shared/Issues.swift`), `IssueBoard`, `IssueMatcher` (`PathGlance/Data/`)
 
 ## Summary
 
-- Open issues first, then ended ones: one section per day, most recent day and end time first.
+- A tab per line; under it the line drawn as its stops, with every open issue written out at the stop it names. (decided and built 2026-11-27: design IG's tabs with IH-b's content)
+- Tapping an issue opens its sheet.
 - The tab's red badge counts open issues whose kind is not muted.
-- Muting a kind keeps it listed but takes it off the badge and the widget; it is explained first.
+- Muting a kind keeps it listed but takes it off the badge, the tabs' counts and the widget; it is explained first.
 - Elevator and escalator notices start muted.
 
 ## Title
 
-"Issues", small and centered, pinned with no background (`TabTitle`). (decided 2026-11-23)
+"Issues", small and centered (`TabTitle`). (decided 2026-11-23)
 
-## Current
+## Tabs
 
-Each open issue: its kind's icon, title, "Since …", and the start of PATH's text. When nothing is open the section says "No issues reported".
+Underline tabs (`UnderlineTabs`), the same as on Trains, with pages that slide sideways by tap or swipe.
 
-Kinds (`IssueKind`): Delay, Suspension, Planned work, Elevator or escalator, Notice. Elevator notices use the brand colour. (decided 2026-11-23)
+- **Three tabs:** JSQ–33rd, NWK–WTC, and Hoboken, which holds the two Hoboken lines (HOB–33rd, then HOB–WTC), each under its own small heading.
+- **Under each name:** "Good" in green, or "2 issues" in orange: the open issues on that tab's lines whose kind is not muted. Issues in "Other" are no line's and are not counted.
+- **Order** follows Settings > Lines preferred: a tab stands where the first of its lines' ends stands in that list (`IssueBoard.tabs`). The standard order gives the three above.
+
+## A line's card
+
+The line's stops on a vertical rail in its map colour (`IssueStrip`).
+
+- **A stop with nothing wrong** is one dim line. Your station carries a "You" tag.
+- **A stop with an issue** gets a filled marker in the kind's colour, and under its name each issue: icon, title, then every update PATH sent, newest first, each with its time (the day too when it is not today). PATH's own leading time is dropped, as in the sheet.
+- **"Whole line"**, above the stops, holds issues that name the line and none of its stops.
+- **"Good service"** heads a card with no issues at all.
+- **A muted kind** is still written out, with a struck bell.
+- **JSQ–33rd shows Hoboken** only when an issue on that line names it; the line calls there only at nights and weekends.
+
+### Where an issue goes (`IssueBoard`)
+
+| PATH's text names | It shows |
+|---|---|
+| A line and one or more of its stops | At those stops, on that line only |
+| A line and no stop | Under "Whole line" on that line |
+| A station and no line (an elevator) | At that stop on every line that calls there |
+| Neither | Under "Other" on every tab |
+
+A delay the app noticed itself sits at the station it was seen from.
+
+## Other
+
+Issues whose wording names no line and no station, listed under every tab so nothing PATH says is hidden.
 
 ## Archived
 
-Ended issues, grouped by day ("Archived · Sun, Nov 22, 2026"), each with its start and end times.
+One row at the bottom of every tab, with the count. It opens a sheet of ended issues grouped by day, most recent first; tapping one opens its sheet.
 
 ## An issue's sheet
 
@@ -35,5 +64,6 @@ Tapping an issue, here or on a Trains banner, opens design DA (`IssueDetailView`
 
 ## Open questions
 
-- **List layout:** the options are on the design page's Review (IG, IM, IH, IJ, IK, IL). None is chosen.
+- **A long incident makes a long stop.** Every update is written out at each stop the issue names, so an issue naming two stops is written twice. Collapsing older updates is an idea, not asked for.
+- **Press and hold** on an issue does nothing; muting is in the issue's sheet. Issues never had a press-and-hold menu.
 - **Matching** (`IssueMatcher`): reads station names and line codes out of PATH's text. It does not read direction, and wording it does not know (a new abbreviation, a place that is not a station) matches nothing.

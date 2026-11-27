@@ -657,11 +657,59 @@ final class PathGlanceUITests: XCTestCase {
 
     // MARK: Issues
 
+    func testIssuesAreLaidOutByLineAndStop() {
+        // Three made-up issues: one on JSQ-33 at two stops, one on NWK-WTC, one that names nothing.
+        launch(tab: "issues", extra: ["-sampleBanners", "YES"])
+        let tabs = app.otherElements["issueTabs"]
+        XCTAssertTrue(tabs.waitForExistence(timeout: 20))
+        XCTAssertEqual(tabs.buttons.count, 3, "A tab per line, the two Hoboken lines together")
+        let first = tabs.buttons.element(boundBy: 0)
+        XCTAssertTrue(first.isSelected)
+        XCTAssertTrue(first.value as? String != "Good", "The line with the signal problem says so under its name")
+        // The signal problem is written out at each stop it names.
+        let signal = app.buttons.matching(identifier: "stopIssue-sample-signal")
+        XCTAssertTrue(signal.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(signal.count, 2, "Grove Street and Newport")
+        XCTAssertTrue(signal.firstMatch.label.contains("Crews on site"), "Every update shows, label is \(signal.firstMatch.label)")
+        XCTAssertTrue(signal.firstMatch.label.contains("Dispatch has reported"), "label is \(signal.firstMatch.label)")
+        shot("31-issues-jsq33")
+        // What names no line or station is under every tab.
+        let other = app.buttons["otherIssue-sample-notice"]
+        reveal(other)
+        XCTAssertTrue(other.exists)
+        XCTAssertTrue(app.buttons["archivedRow"].exists || app.otherElements["archivedRow"].exists)
+        shot("32-issues-other")
+        for _ in 0..<3 { app.swipeDown() }
+
+        // A stop's issue opens its sheet.
+        signal.firstMatch.tap()
+        XCTAssertTrue(app.buttons["muteRow"].waitForExistence(timeout: 5))
+        shot("33-issue-from-stop")
+        app.buttons["Close"].firstMatch.tap()
+        _ = app.buttons["muteRow"].waitForNonExistence(timeout: 3)
+
+        // The next line: its own issue, and the page follows the tab.
+        tabs.buttons.element(boundBy: 1).tap()
+        XCTAssertTrue(tabs.buttons.element(boundBy: 1).waitForSelected())
+        XCTAssertTrue(app.buttons["stopIssue-sample-track"].waitForExistence(timeout: 5))
+        shot("34-issues-nwkwtc")
+        // A swipe turns the page too, to the Hoboken lines.
+        app.swipeLeft()
+        XCTAssertTrue(tabs.buttons.element(boundBy: 2).waitForSelected())
+        shot("35-issues-hoboken")
+        app.terminate()
+
+        // At the largest text size the tabs and the stops still read.
+        launch(tab: "issues", extra: ["-sampleBanners", "YES", "-textSizeOffset", "<integer>\(largestTextOffset)</integer>"])
+        XCTAssertTrue(app.buttons["stopIssue-sample-signal"].firstMatch.waitForExistence(timeout: 20))
+        XCTAssertEqual(app.otherElements["issueTabs"].buttons.count, 3)
+        shot("36-issues-large")
+    }
+
     func testMutingAnIssueKindAsksFirst() {
-        launch(tab: "issues")
-        // Planned-work and elevator notices are open most days; take whichever issue is first.
-        let issue = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Since ' OR label CONTAINS ' – '")).firstMatch
-        guard issue.waitForExistence(timeout: 20) else { return } // no issues at all today
+        launch(tab: "issues", extra: ["-sampleBanners", "YES"])
+        let issue = app.buttons["stopIssue-sample-signal"].firstMatch
+        XCTAssertTrue(issue.waitForExistence(timeout: 20))
         shot("15-issues")
         issue.tap()
         let mute = app.buttons["muteRow"]

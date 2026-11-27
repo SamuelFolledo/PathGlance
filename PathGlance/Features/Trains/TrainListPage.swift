@@ -287,6 +287,9 @@ private struct TrainRows: View, Equatable {
     let onSettle: (Double) -> Void
     let onRefresh: () async -> Void
 
+    /// Every child of the list is this high: room for a late train's two lines.
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 44
+
     static func == (lhs: TrainRows, rhs: TrainRows) -> Bool {
         lhs.list.version == rhs.list.version && lhs.skipped == rhs.skipped && lhs.hidesTarget == rhs.hidesTarget && lhs.moves == rhs.moves
             && lhs.showsPeriod == rhs.showsPeriod && lhs.hasHiddenColumns == rhs.hasHiddenColumns
@@ -304,10 +307,14 @@ private struct TrainRows: View, Equatable {
                     dayHeading(day)
                         .id(day.headerID)
                     if day.rows.isEmpty {
-                        Text("No trains to \(target.name) on this day.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(Theme.Spacing.contentSide)
+                        rowHigh(alignment: .leading) {
+                            Text("No trains to \(target.name) on this day.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .padding(.horizontal, Theme.Spacing.contentSide)
+                        }
                     }
                     ForEach(day.rows) { row in
                         rowView(row)
@@ -327,31 +334,43 @@ private struct TrainRows: View, Equatable {
 
     /// Where one day ends and the next begins. Today's is in the accent color.
     private func dayHeading(_ day: TrainList.Day) -> some View {
-        Text(day.title)
-            .font(.subheadline.weight(.bold))
-            .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.contentSide)
-            .padding(.top, Theme.Spacing.lg)
-            .padding(.bottom, 6)
-            .background(Color(.tertiarySystemGroupedBackground))
-            .accessibilityAddTraits(.isHeader)
+        rowHigh(alignment: .bottomLeading) {
+            Text(day.title)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(day.isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, Theme.Spacing.contentSide)
+                .padding(.bottom, 6)
+        }
+        .background(Color(.tertiarySystemGroupedBackground))
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Gives `content` exactly the height of a train row. The stack is lazy and guesses
+    /// the height of the rows it has not drawn from the ones it has. A shorter heading or
+    /// a taller late train among the few on screen changed that guess for the week of
+    /// rows above, and when it scrolled away the list was thrown hours back. With every
+    /// child the same height the guess is exact.
+    private func rowHigh<Content: View>(alignment: Alignment, @ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .frame(height: rowHeight, alignment: alignment)
     }
 
     @ViewBuilder
     private func rowView(_ row: TrainList.Row) -> some View {
         switch row.kind {
         case .routeChange(let name):
-            HStack(spacing: Theme.Spacing.sm) {
-                Rectangle().fill(.tint).frame(height: 1)
-                Text(name)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tint)
-                    .fixedSize()
-                Rectangle().fill(.tint).frame(height: 1)
+            rowHigh(alignment: .center) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Rectangle().fill(.tint).frame(height: 1)
+                    Text(name)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .fixedSize()
+                    Rectangle().fill(.tint).frame(height: 1)
+                }
+                .padding(.horizontal, Theme.Spacing.contentSide)
             }
-            .padding(.horizontal, Theme.Spacing.contentSide)
-            .padding(.vertical, 6)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("From here, trains run \(name)")
         case .train(let train, let allCells):
@@ -362,7 +381,7 @@ private struct TrainRows: View, Equatable {
             } label: {
                 let stops = Array((hidesTarget ? Array(list.columns.dropLast()) : list.columns).dropFirst(skipped))
                 let sample = TrainColumn<Text>.sampleTime(showsPeriod: showsPeriod)
-                HStack(alignment: .top, spacing: 0) {
+                HStack(alignment: .center, spacing: 0) {
                     TrainColumn(header: origin.shortName, sample: sample, place: .first) {
                         TrainTimeText(time: train.time, lateBy: delay, clock: clock, isDeparture: true)
                     }
@@ -385,7 +404,8 @@ private struct TrainRows: View, Equatable {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .padding(.horizontal, Theme.Spacing.contentSide)
-                .padding(.vertical, 10)
+                // One height for every row, late (two lines) or not: see `rowHigh`.
+                .frame(height: rowHeight)
                 // The live dot sits in the margin, level with the middle of the row, so
                 // the times line up with the rows that have none.
                 .overlay(alignment: .leading) {

@@ -66,3 +66,7 @@ One row per train (`TrainRows`), one section per day; the line where a day ends 
 - **Tap:** opens the train's stops in a sheet. The arrows, or a sideways swipe, step to the train before or after.
 - **Press and hold** (`TrainRowAction`): show every stop; hide a column; remove a favorite stop; show hidden columns; show or hide AM/PM; edit favorite stops; report this train's time by email.
 - **Back to now:** once scrolled well away from the present, a way back is offered.
+
+## Row heights
+
+Every child of the list (a train, a late train with its two lines, a day heading, a route note) is one fixed height that grows with the text size (`rowHeight`). This is not a look choice: the list is lazy, and unequal heights made it jump hours back on the first scroll. (decided 2026-11-27)

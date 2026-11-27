@@ -276,6 +276,11 @@ final class AppModel: ObservableObject {
 
     /// Made-up issues for screenshots and UI tests ("-sampleBanners YES"). Never saved.
     private(set) var sampleIssues: [Issue] = []
+    /// One more made-up issue that names no line or station, for the Issues tab only.
+    private(set) var sampleUnplaced: [Issue] = []
+
+    /// Open issues as the Issues tab lays them out, with the made-up ones when asked for.
+    var boardIssues: [Issue] { issues.active + sampleIssues + sampleUnplaced }
 
     /// Sections that start folded on a fresh install.
     nonisolated static let defaultFoldedSections: Set<String> = ["settings-lines"]
@@ -335,7 +340,10 @@ final class AppModel: ObservableObject {
         foldedSections = folded
         let today = PathTime.ymd(of: Date())
         dismissedBanners = ((UserDefaults.standard.dictionary(forKey: "dismissedBanners") as? [String: Int]) ?? [:]).filter { $0.value == today }
-        if UserDefaults.standard.bool(forKey: "sampleBanners") { sampleIssues = Issue.samples(now: Date()) }
+        if UserDefaults.standard.bool(forKey: "sampleBanners") {
+            sampleIssues = Issue.samples(now: Date())
+            sampleUnplaced = [Issue.unplacedSample(now: Date())]
+        }
         favoriteStops = SharedStore.favoriteStops
         hiddenTargets = SharedStore.hiddenTargets
         lineOrder = SharedStore.lineOrder

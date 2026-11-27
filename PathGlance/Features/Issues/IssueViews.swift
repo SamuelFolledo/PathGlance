@@ -152,6 +152,14 @@ extension Issue {
                   startedAt: now.addingTimeInterval(-95 * 60)),
         ]
     }
+
+    /// A made-up notice that names no line and no station, for the Issues tab's "Other" block.
+    static func unplacedSample(now: Date) -> Issue {
+        Issue(id: "sample-notice", kind: .other, title: "Customer Service",
+              updates: [IssueUpdate(id: 5, date: now.addingTimeInterval(-3 * 3600), subject: "PATHAlert: Customer Service",
+                                    message: "The customer service line is closed for the holiday.")],
+              startedAt: now.addingTimeInterval(-3 * 3600))
+    }
 }
 
 extension AppModel {
@@ -297,60 +305,5 @@ private struct RailRow: View {
                 }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// Open issues first, then ended ones: one section per day, most recent day and end time first.
-struct IssuesView: View {
-    @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var location: LocationService
-    @State private var selected: Issue?
-
-    private var days: [(day: Int, issues: [Issue])] {
-        let grouped = Dictionary(grouping: model.issues.archived) { PathTime.ymd(of: $0.endedAt ?? $0.startedAt) }
-        return grouped.keys.sorted(by: >).map { day in
-            (day, (grouped[day] ?? []).sorted { ($0.endedAt ?? .distantPast) > ($1.endedAt ?? .distantPast) })
-        }
-    }
-
-    var body: some View {
-        ScrollViewReader { reader in
-            List {
-                Section {
-                    if model.issues.active.isEmpty {
-                        Label("No issues reported", systemImage: "checkmark.circle")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(model.issues.active) { issue in
-                        IssueRow(issue: issue, countsOnBadge: !model.mutedKinds.contains(issue.kind),
-                                 isMuted: model.mutedKinds.contains(issue.kind)) { selected = $0 }
-                    }
-                } header: {
-                    Text("Current")
-                }
-                .id("top")
-                ForEach(days, id: \.day) { entry in
-                    Section {
-                        ForEach(entry.issues) { issue in
-                            IssueRow(issue: issue, isMuted: model.mutedKinds.contains(issue.kind)) { selected = $0 }
-                        }
-                    } header: {
-                        Text("Archived · " + (PathTime.date(fromYMD: entry.day).map(PathFormat.dayWithYear) ?? ""))
-                    }
-                }
-            }
-            .refreshable {
-                await model.refreshIssues()
-            }
-            // The title stays put with nothing behind it; the list fades out underneath.
-            .pinnedBarTop { TabTitle(title: "Issues") }
-            .onChange(of: model.resetCount[.issues]) {
-                selected = nil
-                withAnimation { reader.scrollTo("top", anchor: .top) }
-            }
-        }
-        .appSheet(item: $selected, title: { $0.title }) { issue in
-            IssueDetailView(issue: issue, relevance: IssueMatcher.relevance(of: issue, station: model.station(nearest: location.station), target: nil))
-        }
     }
 }

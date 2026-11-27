@@ -27,7 +27,7 @@ Open work, in one list. No tickets, no board.
 	- G5 chosen and added; the widget extension has no icon of its own (2026-11-26)
 - [ ] Dark and tinted variants of the app icon (2026-11-26)
 - [ ] Decide on the Issues tab ideas IA to IF and the Widget tab ideas WA to WF (2026-11-23)
-	- Issues round two drawn (IG to IN, detail sheets DA and DB). DA chosen as the detail sheet and IN liked for the Trains tab (2026-11-25); both built 2026-11-26. The list layout is still open
+	- Issues round two drawn (IG to IN, detail sheets DA and DB). DA chosen as the detail sheet and IN liked for the Trains tab (2026-11-25); both built 2026-11-26. The list is IG tabs with IH-b content, built 2026-11-27
 	- Widget tab: drawings asked for underline tabs switching the preview between half and full width, and for a small one-slot widget; not decided (2026-11-25)
 	- Widget tab decided and built: Rectangle and Round shapes behind underline tabs, a preset carousel in place of the Presets row, a custom look per shape, five round presets (2026-11-26)
 	- Waiting for answers: shared settings first or last; the round presets' fonts and pairings; approval of the eleven rectangle presets (2026-11-26)
@@ -74,7 +74,8 @@ Open work, in one list. No tickets, no board.
 - [x] Settings does not open again once a guide has been shown from inside it and closed (seen with Restore defaults > Cancel and with the hide-line guide, in UI tests; the same happens on the commit before these changes). Relaunching clears it. Not yet tried by hand (2026-11-27)
 	- Found and fixed. The button worked; what broke was its accessibility frame, which became the whole screen, so a UI test (and VoiceOver's focus) aimed at the middle of the screen. A popup hid the screen under it from accessibility on top of a sheet that had already hidden its own. A popup now relies on being modal and hides nothing; `testSettingsOpensAgainAfterAGuide` covers it (2026-11-27)
 - [ ] `testFavoriteStopAddsAColumn` failed once in a full run at about 5:20 AM ("originMenu" not found right after launch) and passed alone; `testHeaderGivesWayToTheDateWhenScrolled` failed in the run and alone at that hour. Both look like the early-morning scroll problem below; not chased (2026-11-27)
-- [ ] Around 4 AM, at the largest text size, a short scroll on the train list lands on yesterday afternoon. `testHeaderGivesWayToTheDateWhenScrolled` fails on it at that hour. A guess, not checked: rows of the day before are laid out lazily above the first train of the day, and their real heights shift the list as they load (2026-11-27)
+- [x] The train list jumped hours back on the first scroll in the early morning (2026-11-27)
+	- Cause: the list is lazy and guesses the height of undrawn rows from the drawn ones. A day heading or a late train's two-line row among the few on screen changed the guess for the week of rows above; when it scrolled away the list was thrown back. Seen in logs as the top row going from 6:29 AM today to 3:54 PM yesterday. Every child is now one fixed height (`rowHigh`, `rowHeight` in `TrainListPage.swift`). `testHeaderGivesWayToTheDateWhenScrolled` failed on it about every other run before 6 AM and passes since
 
 ## Tests
 
